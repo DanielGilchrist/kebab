@@ -1,0 +1,11 @@
+name: kebab
+version: 0.1.0
+
+description: A type-safe CLI parser for Crystal
+
+authors:
+  - Daniel Gilchrist <danniieelg@gmail.com>
+
+crystal: ">= 1.20.0"
+
+license: MIT
