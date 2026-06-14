@@ -440,3 +440,79 @@ describe Kebab::Convert::Enum do
     error.should be_a(Kebab::Error::InvalidValueOf(SpecOutputFormat))
   end
 end
+
+record SelfRunContext, log : Array(String)
+
+private struct SelfRunLeaf
+  include Kebab::Parseable
+
+  @[Kebab::Option(short: 'v')]
+  getter? verbose : Bool = false
+
+  def run(context : SelfRunContext) : Nil
+    context.log << "ran verbose=#{verbose?}"
+  end
+end
+
+@[Kebab::Command(name: "parent")]
+private struct SelfRunParent
+  include Kebab::Parseable
+
+  @[Kebab::Subcommand]
+  getter command : SelfRunLeaf
+end
+
+describe "Kebab::Parseable.run (class-level)" do
+  it "dispatches to the leaf's run when parsing succeeds" do
+    ctx = SelfRunContext.new(log: [] of String)
+    result = SelfRunLeaf.run(["-v"], ctx)
+    result.should be_true
+    ctx.log.should eq(["ran verbose=true"])
+  end
+
+  it "forwards through a subcommand parent to the leaf" do
+    ctx = SelfRunContext.new(log: [] of String)
+    SelfRunParent.run(["self_run_leaf", "-v"], ctx)
+    ctx.log.should eq(["ran verbose=true"])
+  end
+
+  it "writes help to the provided stdout and returns true" do
+    stdout = IO::Memory.new
+    SelfRunLeaf.run(["--help"], SelfRunContext.new(log: [] of String), stdout: stdout).should be_true
+    stdout.to_s.should contain("Usage: self_run_leaf")
+  end
+
+  it "writes errors to the provided stderr and returns false" do
+    stderr = IO::Memory.new
+    SelfRunLeaf.run(["--bogus"], SelfRunContext.new(log: [] of String), stderr: stderr).should be_false
+    stderr.to_s.should contain("isn't a recognised option")
+  end
+
+  it "forwards multiple positional args to the leaf's run" do
+    log = [] of String
+    SelfRunMultiArg.run([] of String, log, "tag")
+    log.should eq(["ran:tag"])
+  end
+
+  it "forwards keyword args to the leaf's run" do
+    log = [] of String
+    SelfRunKwarg.run([] of String, log, label: "kw")
+    log.should eq(["ran:kw"])
+  end
+end
+
+private struct SelfRunMultiArg
+  include Kebab::Parseable
+
+  def run(log : Array(String), tag : String) : Nil
+    log << "ran:#{tag}"
+  end
+end
+
+private struct SelfRunKwarg
+  include Kebab::Parseable
+
+  def run(log : Array(String), *, label : String) : Nil
+    log << "ran:#{label}"
+  end
+end

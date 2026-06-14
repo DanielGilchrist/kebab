@@ -23,6 +23,20 @@ module Kebab
         ex.result
       end
 
+      def self.run(args : Array(String), *forward_args, stdout : IO = STDOUT, stderr : IO = STDERR, **forward_kwargs) : Bool
+        case result = parse(args)
+        when ::Kebab::Help
+          stdout.puts(result)
+          true
+        when ::Kebab::Errors
+          stderr.puts(result)
+          false
+        else
+          result.run(*forward_args, **forward_kwargs)
+          true
+        end
+      end
+
       {% verbatim do %}
         def initialize(*, __kebab_args args : Array(String), __kebab_parent_path parent_path : Array(String) = [] of String)
           @__kebab_parent_path = parent_path
@@ -489,13 +503,13 @@ module Kebab
       {% end %}
     end
 
-    def run(context) : Nil
+    def run(*forward_args, **forward_kwargs) : Nil
       {% begin %}
         {% subcommand_ivar = @type.instance_vars.find(&.annotation(::Kebab::Subcommand)) %}
         {% if subcommand_ivar %}
-          @{{subcommand_ivar.id}}.run(context)
+          @{{subcommand_ivar.id}}.run(*forward_args, **forward_kwargs)
         {% else %}
-          raise "#{self.class}#run isn't defined. Add `def run(context : YourContextType) : Nil` so kebab can call it after parsing."
+          raise "#{self.class}#run isn't defined. Add `def run(...) : Nil` so kebab can call it after parsing."
         {% end %}
       {% end %}
     end
