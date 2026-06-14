@@ -98,9 +98,9 @@ describe "Kebab::Parseable subcommands" do
     error.message.should eq("a command is required.")
   end
 
-  it "exposes command and commands on UnknownCommand" do
+  it "exposes input and commands on UnknownCommand" do
     error = SubcommandSpecClock.parse(["strat"]).as(Kebab::Error::UnknownCommand)
-    error.command.should eq("strat")
+    error.input.should eq("strat")
     error.commands.map(&.name).should eq(["break", "start", "subcommand_spec_finish", "help"])
   end
 

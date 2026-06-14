@@ -1,13 +1,24 @@
+require "../schema/option"
 require "./base"
 
 module Kebab
   module Error
-    class MissingValue < Error::Base
-      def initialize(@option : String)
-        super("option \"#{@option}\" expects a value.")
+    # An option needed a value but didn't get one (e.g. `--at` at the end
+    # of the arg list, or `--at --verbose`).
+    abstract struct MissingValue < Error::Base
+      def initialize(@option : Schema::Option)
+        super("option \"--#{@option.long}\" expects a value.")
       end
 
-      getter option : String
+      # The option that needed a value.
+      getter option : Schema::Option
+
+      # Concrete subclass parameterised by the command `C`.
+      struct For(C) < MissingValue
+        def command : C.class
+          C
+        end
+      end
     end
   end
 end

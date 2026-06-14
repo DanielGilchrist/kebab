@@ -200,7 +200,7 @@ describe Kebab::Parseable do
   it "errors when a required positional argument is missing" do
     error = Trim.parse([] of String).as(Kebab::Errors)
     error.should be_a(Kebab::Error::MissingArgument)
-    error.message.should eq("argument \"path\" is required.")
+    error.message.should eq("argument \"<path>\" is required.")
   end
 
   it "accepts option values after the -- separator as positionals" do
@@ -260,29 +260,29 @@ describe Kebab::Parseable do
     ConstantDefault.parse([] of String).as(ConstantDefault).weeks.should eq(52)
   end
 
-  it "exposes the option name on UnknownOption" do
+  it "exposes the typed input on UnknownOption" do
     error = parse_punch_error!(["--nope"]).as(Kebab::Error::UnknownOption)
-    error.option.should eq("--nope")
+    error.input.should eq("--nope")
   end
 
-  it "exposes the option name on MissingValue" do
+  it "exposes a Schema::Option on MissingValue" do
     error = parse_punch_error!(["--at"]).as(Kebab::Error::MissingValue)
-    error.option.should eq("--at")
+    error.option.long.should eq("at")
   end
 
-  it "exposes the option name on RepeatedOption" do
+  it "exposes a Schema::Option on RepeatedOption" do
     error = parse_punch_error!(["--at", "8:45", "--at", "9:30"]).as(Kebab::Error::RepeatedOption)
-    error.option.should eq("--at")
+    error.option.long.should eq("at")
   end
 
-  it "exposes the argument name on MissingArgument" do
+  it "exposes a Schema::Argument on MissingArgument" do
     error = Trim.parse([] of String).as(Kebab::Error::MissingArgument)
-    error.argument.should eq("path")
+    error.argument.name.should eq("path")
   end
 
-  it "exposes the option name on MissingOption" do
+  it "exposes a Schema::Option on MissingOption" do
     error = RequiredOption.parse([] of String).as(Kebab::Error::MissingOption)
-    error.option.should eq("--token")
+    error.option.long.should eq("token")
   end
 
   it "exposes the raw value on UnexpectedArgument" do
@@ -292,21 +292,24 @@ describe Kebab::Parseable do
 
   it "exposes structured fields on InvalidValue" do
     error = parse_punch_error!(["--weeks", "potato"]).as(Kebab::Error::InvalidValue)
-    error.option.should eq("--weeks")
     error.value.should eq("potato")
     error.target_type_name.should eq("Int32")
     error.target_name.should eq("whole number")
     error.reason.should be_nil
-    error.should be_a(Kebab::Error::InvalidValueOf(Int32))
+    case source = error.source
+    in Kebab::Schema::Option   then source.long.should eq("weeks")
+    in Kebab::Schema::Argument then fail "expected option source"
+    end
+    error.should be_a(Kebab::Error::InvalidValue::Typed(Int32, Punch))
   end
 
   it "narrows InvalidValue by target type via case" do
     error = parse_punch_error!(["--weeks", "potato"])
     case error
-    when Kebab::Error::InvalidValueOf(Int32)
+    when Kebab::Error::InvalidValue::Of(Int32)
       error.target_type.should eq(Int32)
     else
-      fail "expected InvalidValueOf(Int32)"
+      fail "expected InvalidValue::Of(Int32)"
     end
   end
 end
@@ -393,9 +396,12 @@ describe "Kebab::Parseable variadic arguments" do
   end
 
   it "reports the failing element when a variadic element fails to convert" do
-    error = VariadicTyped.parse(["1", "potato", "3"]).as(Kebab::Error::InvalidValueOf(Int32))
+    error = VariadicTyped.parse(["1", "potato", "3"]).as(Kebab::Error::InvalidValue)
     error.value.should eq("potato")
-    error.option.should eq("values")
+    case source = error.source
+    in Kebab::Schema::Argument then source.name.should eq("values")
+    in Kebab::Schema::Option   then fail "expected argument source"
+    end
   end
 
   it "shows the variadic tail in the usage line and arguments section" do
@@ -415,9 +421,49 @@ describe "Kebab::Parseable variadic arguments" do
   end
 
   it "reports the failing element when a variadic-with-converter element fails" do
-    error = VariadicWithConverter.parse(["1", "potato", "3"]).as(Kebab::Error::InvalidValueOf(Int32))
+    error = VariadicWithConverter.parse(["1", "potato", "3"]).as(Kebab::Error::InvalidValue)
     error.value.should eq("potato")
     error.target_name.should eq("doubled int")
+  end
+end
+
+private struct HandlerSpecLeaf
+  include Kebab::Parseable
+
+  @[Kebab::Option]
+  getter weeks : Int32 = 4
+
+  def self.on_parse_error(error : Kebab::Errors, stderr : IO) : Bool
+    case error
+    when Kebab::Error::InvalidValue::Of(Int32)
+      stderr.puts("custom: bad int")
+      true
+    else
+      false
+    end
+  end
+end
+
+@[Kebab::Command(name: "parent")]
+private struct HandlerSpecParent
+  include Kebab::Parseable
+
+  @[Kebab::Subcommand]
+  getter command : HandlerSpecLeaf
+end
+
+describe "Kebab::Parseable in-command error handlers" do
+  it "routes errors to the responsible command's on_parse_error" do
+    stderr = IO::Memory.new
+    result = HandlerSpecParent.run(["handler_spec_leaf", "--weeks", "potato"], stderr: stderr)
+    result.should be_false
+    stderr.to_s.should eq("custom: bad int\n")
+  end
+
+  it "falls back to default rendering when handler returns false" do
+    stderr = IO::Memory.new
+    HandlerSpecParent.run(["handler_spec_leaf", "--bogus"], stderr: stderr)
+    stderr.to_s.should contain("isn't a recognised option")
   end
 end
 
@@ -431,13 +477,20 @@ describe Kebab::Convert::Enum do
     EnumHaver.parse([] of String).as(EnumHaver).format.should eq(SpecOutputFormat::Text)
   end
 
+  it "uses the leaf's on_parse_error handler when running via Type.run" do
+    EnumHaver.parse(["--format", "xml"]).as(Kebab::Error::InvalidValue::Of(SpecOutputFormat))
+  end
+
   it "errors with the valid names when unrecognised" do
     error = EnumHaver.parse(["--format", "xml"]).as(Kebab::Error::InvalidValue)
     error.reason.should eq("one of: json, yaml, text")
-    error.option.should eq("--format")
     error.value.should eq("xml")
     error.target_type_name.should eq("SpecOutputFormat")
-    error.should be_a(Kebab::Error::InvalidValueOf(SpecOutputFormat))
+    case source = error.source
+    in Kebab::Schema::Option   then source.long.should eq("format")
+    in Kebab::Schema::Argument then fail "expected option source"
+    end
+    error.should be_a(Kebab::Error::InvalidValue::Of(SpecOutputFormat))
   end
 end
 

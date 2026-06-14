@@ -1,13 +1,23 @@
+require "../schema/option"
 require "./base"
 
 module Kebab
   module Error
-    class RepeatedOption < Error::Base
-      def initialize(@option : String)
-        super("option \"#{@option}\" was given more than once.")
+    # The same option was supplied more than once.
+    abstract struct RepeatedOption < Error::Base
+      def initialize(@option : Schema::Option)
+        super("option \"--#{@option.long}\" was given more than once.")
       end
 
-      getter option : String
+      # The option that was repeated.
+      getter option : Schema::Option
+
+      # Concrete subclass parameterised by the command `C`.
+      struct For(C) < RepeatedOption
+        def command : C.class
+          C
+        end
+      end
     end
   end
 end

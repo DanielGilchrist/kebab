@@ -5,13 +5,19 @@ require "./base"
 
 module Kebab
   module Error
-    class UnknownCommand < Error::Base
-      def initialize(@command : String, @commands : Array(Schema::Command), @usage : Schema::Usage::Subcommand)
-        super("\"#{@command}\" isn't a known command.")
+    # The user typed a subcommand kebab doesn't know about.
+    abstract struct UnknownCommand < Error::Base
+      def initialize(@input : String, @commands : Array(Schema::Command), @usage : Schema::Usage::Subcommand)
+        super("\"#{@input}\" isn't a known command.")
       end
 
-      getter command : String
+      # The token the user typed.
+      getter input : String
+
+      # The subcommands the parent accepts.
       getter commands : Array(Schema::Command)
+
+      # The Usage line for the parent command.
       getter usage : Schema::Usage::Subcommand
 
       def to_s(io : IO) : Nil
@@ -20,6 +26,13 @@ module Kebab
         Renderer.usage(io, @usage)
         io << "\n\n"
         Renderer.section(io, "Commands:", @commands)
+      end
+
+      # Concrete subclass parameterised by the parent command `C`.
+      struct For(C) < UnknownCommand
+        def command : C.class
+          C
+        end
       end
     end
   end
