@@ -1,13 +1,21 @@
 module Kebab
   module Schema
     module Usage
+      # Usage line shape for a command with positional arguments (no subcommand).
       struct Arguments
         def initialize(@command_path : Array(String), @has_options : Bool, @argument_names : Array(String), @has_variadic_tail : Bool = false)
         end
 
+        # Path of command names from the binary down to this command.
         getter command_path : Array(String)
+
+        # `true` if the command declares any options.
         getter? has_options : Bool
+
+        # Argument names in declaration order (used as `<name>` in the usage line).
         getter argument_names : Array(String)
+
+        # `true` if the last argument is variadic (`Array(T)`).
         getter? has_variadic_tail : Bool
 
         def to_s(io : IO) : Nil

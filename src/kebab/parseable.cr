@@ -28,11 +28,10 @@ module Kebab
         ex.result
       end
 
-      # Parses `args` and dispatches: calls `instance.run(*forward_args,
-      # **forward_kwargs)` on success, writes help to `stdout`, writes
-      # errors to `stderr`. Returns `true` on success or help, `false` on
-      # error. Define `self.on_parse_error` on a command to customise how
-      # errors for that command are rendered.
+      # Parses `args` and dispatches: calls `instance.run(*forward_args, **forward_kwargs)`
+      # on success, writes help to `stdout`, writes errors to `stderr`.
+      # Returns `true` on success or help, `false` on error.
+      # Define `self.on_parse_error` on a command to customise how errors for that command are rendered.
       def self.run(args : Array(String), *forward_args, stdout : IO = STDOUT, stderr : IO = STDERR, **forward_kwargs) : Bool
         case result = parse(args)
         when ::Kebab::Help

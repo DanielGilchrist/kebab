@@ -1,9 +1,21 @@
 require "./convert/failure"
 
 module Kebab
+  # Built-in converters for the standard library types kebab knows how to
+  # parse out of the box, plus the `failure` factory for writing your own.
+  #
+  # A converter is anything responding to `parse(input : String) :
+  # T | Kebab::Convert::Failure`. Attach one to a field with
+  # `@[Kebab::Option(converter: MyConverter)]` or
+  # `@[Kebab::Argument(converter: MyConverter)]`.
   module Convert
     extend self
 
+    # Builds a `Failure` for a converter to return.
+    #
+    # `reason` is the parenthetical shown after the default message.
+    # `name` overrides the rendered noun for the target type (e.g.
+    # `"whole number"` instead of `"Int32"`). Both are optional.
     def failure(reason : String? = nil, *, name : String? = nil) : Failure
       Failure.new(reason: reason, name: name)
     end

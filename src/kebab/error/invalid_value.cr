@@ -55,8 +55,7 @@ module Kebab
         end
       end
 
-      # Concrete subclass parameterised by the target type `T` and the
-      # command `C`.
+      # Concrete subclass parameterised by the target type `T` and the command `C`.
       struct Typed(T, C) < InvalidValue
         include InvalidValue::For(C)
         include InvalidValue::Of(T)
