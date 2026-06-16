@@ -175,7 +175,7 @@ module Kebab
                           takes_value: {{base != Bool}},
                         )
                         unless %value{ivar.name}.nil?
-                          __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}))
+                          __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}, options: __kebab_options_schema, usage: __kebab_usage))
                         end
                         {% if base == Bool %}
                           if %inline = %token.value
@@ -235,7 +235,7 @@ module Kebab
                             takes_value: {{base != Bool}},
                           )
                           unless %value{ivar.name}.nil?
-                            __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}))
+                            __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}, options: __kebab_options_schema, usage: __kebab_usage))
                           end
                           {% if base == Bool %}
                             if %last_char && (%inline = %token.value)
@@ -248,7 +248,7 @@ module Kebab
                             end
                             %value{ivar.name} = true
                           {% else %}
-                            __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(%schema{ivar.name})) unless %last_char
+                            __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(%schema{ivar.name}, options: __kebab_options_schema, usage: __kebab_usage)) unless %last_char
 
                             %raw_value = %token.value || __kebab_next_value(args, %index, %separated, %schema{ivar.name}).tap { %index += 1 }
                             {% if converter %}
@@ -587,7 +587,7 @@ module Kebab
           next_raw = args[index + 1]?
           if next_raw.nil? || (!separated && !::Kebab::Scanner.scan(next_raw).is_a?(::Kebab::Tokens::Positional))
             {% begin %}
-              __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(option))
+              __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(option, options: __kebab_options_schema, usage: __kebab_usage))
             {% end %}
           end
 
