@@ -62,7 +62,7 @@ module Kebab
           {% begin %}
             {% subcommand_ivar = @type.instance_vars.find(&.annotation(::Kebab::Subcommand)) %}
             {% if subcommand_ivar %}
-              {% members = subcommand_ivar.type.union? ? subcommand_ivar.type.union_types.reject { |t| t == Nil } : [subcommand_ivar.type] %}
+              {% members = subcommand_ivar.type.union? ? subcommand_ivar.type.union_types.reject { |union_type| union_type == Nil } : [subcommand_ivar.type] %}
               {% for member in members %}
                 if {{member}}.__kebab_route_error(error, stderr)
                   return true
