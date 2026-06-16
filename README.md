@@ -50,6 +50,11 @@ Runnable walkthroughs in [`examples/`](examples/):
 - [`examples/subcommands/`](examples/subcommands/) — multi-level command tree.
 - [`examples/errors/`](examples/errors/) — typed error dispatch and in-command handlers.
 
+## Colour
+
+Help and error output is colourised through Crystal's `Colorize`, which
+disables itself when the output is not a TTY. To force it off (for example in a host program that handles its own colour), set `Colorize.enabled = false` before calling `parse` or `run`.
+
 ## API docs
 
 Generate them with `crystal docs` from the repo root.
