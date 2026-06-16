@@ -4,6 +4,18 @@ A type-safe CLI parser for Crystal.
 
 WIP. Public API is subject to change.
 
+## Installation
+
+Add the dependency to your `shard.yml`:
+
+```yaml
+dependencies:
+  kebab:
+    github: DanielGilchrist/kebab
+```
+
+Then run `shards install`.
+
 ## Quick example
 
 ```crystal
