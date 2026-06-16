@@ -40,6 +40,17 @@ struct HelpSpecTrim
   getter limit : Int32 = 10
 end
 
+@[Kebab::Command(name: "trim", summary: "Trim a file")]
+struct HelpSpecTrimWithOption
+  include Kebab::Parseable
+
+  @[Kebab::Option(description: "Overwrite without prompting")]
+  getter? force : Bool = false
+
+  @[Kebab::Argument(description: "File to trim")]
+  getter path : String
+end
+
 private def help_for(result) : String
   case result
   when Kebab::Help
@@ -88,7 +99,7 @@ describe "Kebab::Parseable help" do
     help_for(HelpSpecTrim.parse(["--help"])).should eq(<<-HELP
       Trim a file
 
-      Usage: trim [options] <path> <limit>
+      Usage: trim <path> <limit>
 
       Arguments:
         <path>   File to trim
@@ -96,6 +107,23 @@ describe "Kebab::Parseable help" do
 
       Options:
         -h, --help  Show this help
+
+      HELP
+    )
+  end
+
+  it "shows [options] in the arguments usage line when the command declares options" do
+    help_for(HelpSpecTrimWithOption.parse(["--help"])).should eq(<<-HELP
+      Trim a file
+
+      Usage: trim [options] <path>
+
+      Arguments:
+        <path>  File to trim
+
+      Options:
+            --force  Overwrite without prompting
+        -h, --help   Show this help
 
       HELP
     )

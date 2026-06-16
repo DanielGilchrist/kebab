@@ -449,7 +449,7 @@ module Kebab
             {% else %}
               ::Kebab::Schema::Usage::Arguments.new(
                 command_path: @__kebab_parent_path + [{{command_name}}],
-                has_options: true,
+                has_options: {{has_options}},
                 argument_names: {{argument_names}} of ::String,
                 has_variadic_tail: {{tail_variadic}},
               )
