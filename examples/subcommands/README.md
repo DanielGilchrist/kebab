@@ -13,7 +13,7 @@ crystal run main.cr -- add --help
 crystal run main.cr -- bogus
 ```
 
-## What to look at
+## How it works
 
 The parent's subcommand field is a union type of commands:
 

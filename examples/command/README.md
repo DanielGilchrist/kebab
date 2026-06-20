@@ -11,7 +11,7 @@ crystal run main.cr -- --help
 crystal run main.cr -- Daniel --doesnt-exist
 ```
 
-## What to look at
+## How it works
 
 `Greet.run(ARGV)` returns `Bool`. `true` for success or help, `false` for parse errors.
 

@@ -14,7 +14,7 @@ crystal run main.cr -- "select *" -l potato
 crystal run main.cr -- --bogus
 ```
 
-## What to look at
+## How it works
 
 ### Typed dispatch on conversion errors
 

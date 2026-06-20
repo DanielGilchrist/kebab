@@ -11,7 +11,7 @@ crystal run main.cr -- --help
 crystal run main.cr -- --bogus
 ```
 
-## What to look at
+## How it works
 
 `Greet.parse(ARGV)` returns `Greet | Kebab::Help | Kebab::Errors`. The `case ... in` is exhaustive so the compiler tells you if you forget a branch.
 
