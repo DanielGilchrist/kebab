@@ -4,16 +4,16 @@ The struct carries its behaviour in `def run`. `Type.run(ARGV)` parses, calls `r
 
 ## Run it
 
-```
+```sh
 crystal run main.cr -- Daniel
 crystal run main.cr -- Daniel -l -n 3
 crystal run main.cr -- --help
-crystal run main.cr -- Daniel --weeks 5
+crystal run main.cr -- Daniel --doesnt-exist
 ```
 
 ## What to look at
 
-`Greet.run(ARGV)` returns `Bool` — `true` for success or help, `false` for parse errors. The `exit(1) unless` pattern is the typical wrapper.
+`Greet.run(ARGV)` returns `Bool`. `true` for success or help, `false` for parse errors.
 
 `Type.run` forwards any extra positional or keyword args to `run`:
 
@@ -32,4 +32,4 @@ stderr = IO::Memory.new
 Greet.run(ARGV, stdout: stdout, stderr: stderr)
 ```
 
-Help goes to `stdout`. Errors go to `stderr`. Defaults are the real ones.
+Help goes to `stdout`. Errors go to `stderr`.

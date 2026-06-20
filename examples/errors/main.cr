@@ -10,19 +10,6 @@ end
 struct Query
   include Kebab::Parseable
 
-  @[Kebab::Argument(description: "Query text")]
-  getter text : String
-
-  @[Kebab::Option(short: 'f', description: "Output format", converter: Kebab::Convert::Enum(OutputFormat))]
-  getter format : OutputFormat = OutputFormat::Text
-
-  @[Kebab::Option(short: 'l', description: "Result limit (1-1000)")]
-  getter limit : Int32 = 10
-
-  def run : Nil
-    puts "Running '#{text}' (format=#{format}, limit=#{limit})"
-  end
-
   def self.on_parse_error(error : Kebab::Errors, stderr : IO) : Bool
     case error
     when Kebab::Error::InvalidValue::Of(OutputFormat)
@@ -34,6 +21,19 @@ struct Query
     else
       false
     end
+  end
+
+  @[Kebab::Argument(description: "Query text")]
+  getter text : String
+
+  @[Kebab::Option(short: 'f', description: "Output format", converter: Kebab::Convert::Enum(OutputFormat))]
+  getter format : OutputFormat = OutputFormat::Text
+
+  @[Kebab::Option(short: 'l', description: "Result limit (1-1000)")]
+  getter limit : Int32 = 10
+
+  def run : Nil
+    puts "Running '#{text}' (format=#{format}, limit=#{limit})"
   end
 end
 

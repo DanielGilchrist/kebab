@@ -1,10 +1,10 @@
 # Parsing mode
 
-Use kebab as a pure argument parser. The struct holds the parsed data and nothing else. No `def run`. The caller pattern-matches on the result and does whatever it wants.
+Use kebab as a pure argument parser. The struct holds the parsed data and nothing else (no `def run`). The caller pattern-matches on the result and does whatever.
 
 ## Run it
 
-```
+```sh
 crystal run main.cr -- Daniel
 crystal run main.cr -- Daniel -l
 crystal run main.cr -- --help

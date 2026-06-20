@@ -4,15 +4,15 @@ Every parse failure is a value in the `Kebab::Errors` union. Errors are dispatch
 
 ## Run it
 
-```
+```sh
 crystal run main.cr -- "select *"
 crystal run main.cr -- "select *" -f yaml
+
+# Below 3 result in a parsing error
 crystal run main.cr -- "select *" -f xml
 crystal run main.cr -- "select *" -l potato
 crystal run main.cr -- --bogus
 ```
-
-The last three trip the handler.
 
 ## What to look at
 
