@@ -13,7 +13,7 @@ crystal run main.cr -- --bogus
 
 ## How it works
 
-`Greet.parse(ARGV)` returns `Greet | Kebab::Help | Kebab::Errors`. The `case ... in` is exhaustive so the compiler tells you if you forget a branch.
+`Greet.parse(ARGV)` returns `Greet | Kebab::Help | Kebab::Errors` and never raises. The `case ... in` is exhaustive so the compiler tells you if you forget a branch.
 
 Good fit when:
 - the CLI is small enough that the parsed data is all you need

@@ -6,10 +6,6 @@ struct Add
 
   @[Kebab::Argument(description: "Task description")]
   getter description : String
-
-  def run : Nil
-    puts "Added: #{description}"
-  end
 end
 
 @[Kebab::Command(summary: "Show all tasks")]
@@ -18,10 +14,6 @@ struct List
 
   @[Kebab::Option(short: 'a', description: "Include completed")]
   getter? all : Bool = false
-
-  def run : Nil
-    puts all? ? "Showing all tasks" : "Showing pending tasks"
-  end
 end
 
 @[Kebab::Command(name: "tasks", summary: "A tiny todo app")]
@@ -32,4 +24,19 @@ struct Tasks
   getter command : Add | List
 end
 
-exit(1) unless Tasks.run(ARGV)
+# Tasks.parse(ARGV) : Tasks | Kebab::Help | Kebab::Errors
+case result = Tasks.parse(ARGV)
+in Tasks
+  # The chosen subcommand lives in result.command, typed Add | List.
+  case sub = result.command
+  in Add
+    puts "Added: #{sub.description}"
+  in List
+    puts sub.all? ? "Showing all tasks" : "Showing pending tasks"
+  end
+in Kebab::Help
+  puts result
+in Kebab::Errors
+  STDERR.puts result
+  exit(1)
+end

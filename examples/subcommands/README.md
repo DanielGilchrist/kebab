@@ -1,6 +1,6 @@
 # Subcommands
 
-A parent command dispatches to one of several child commands via `@[Kebab::Subcommand]`. The parent type is a union of the children.
+A parent command dispatches to one of several child commands via `@[Kebab::Subcommand]`. The parent's subcommand field is a union of the children.
 
 ## Run it
 
@@ -15,17 +15,42 @@ crystal run main.cr -- bogus
 
 ## How it works
 
-The parent's subcommand field is a union type of commands:
+The parent declares its children as a union:
 
 ```crystal
 @[Kebab::Subcommand]
 getter command : Add | List
 ```
 
-Kebab generates the dispatch from the union. The CLI command name for each child is the underscored struct name (`add`, `list`) unless overridden with `@[Kebab::Command(name: "...")]`.
+The CLI name for each child is the underscored struct name (`add`, `list`) unless overridden with `@[Kebab::Command(name: "...")]`.
 
-When you call `Tasks.run(ARGV)` kebab walks the tree: parses the parent, picks the child by name, parses its args, calls the child's `run`. Help and errors at every level show the full command path (`tasks add`, `tasks list`, etc).
+`Tasks.parse(ARGV)` returns `Tasks | Kebab::Help | Kebab::Errors`. On success you get the parent, never a child. The chosen child is data on the instance, in `result.command`, typed `Add | List`. So you match in two levels: first the parse result, then the subcommand.
 
-## Signature consistency
+```crystal
+case result = Tasks.parse(ARGV)
+in Tasks
+  case sub = result.command
+  in Add  then # ...
+  in List then # ...
+  end
+in Kebab::Help   then # ...
+in Kebab::Errors then # ...
+end
+```
 
-Subcommand parents auto-forward args to their chosen child. So `Tasks.run(ARGV, context)` flows through to `Add.run(context)` or `List.run(context)`. All children under the same parent must accept the same signature.
+## Exhaustiveness
+
+`result.command` is a real Crystal union, so the inner `case ... in` is checked at compile time. Drop a child and the compiler names it:
+
+```
+Error: case is not exhaustive.
+
+Missing types:
+ - List
+```
+
+Handle some children with `when` and leave an `else`, and `else` sees the union of the rest. After `when Add`, the bound variable is `(List | Done)`. This is plain Crystal flow typing over the union, nothing kebab-specific.
+
+## Running children directly
+
+Children carry data here, not behaviour. To make each child own its logic, give it a `def run` and dispatch with `Tasks.run(ARGV)`. See [`../command/`](../command/) for the run pattern.

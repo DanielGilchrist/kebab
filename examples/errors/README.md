@@ -1,6 +1,6 @@
 # Error handling
 
-Every parse failure is a value in the `Kebab::Errors` union. Errors are dispatchable by type and command. Commands can also intercept their own errors with `self.on_parse_error`.
+Every parse failure is a value in the `Kebab::Errors` union. In parsing mode you handle it in the `in Kebab::Errors` arm, dispatching on the type of failure.
 
 ## Run it
 
@@ -24,12 +24,12 @@ crystal run main.cr -- --bogus
 - command: `InvalidValue::For(C)`
 - both: `InvalidValue::Typed(T, C)`
 
-The handler in `main.cr` uses `Of(OutputFormat)` and `Of(Int32)` to give targeted error messages per target type.
-
-### In-command handler
-
-`def self.on_parse_error(error, stderr)` runs when `Type.run` hits an error attributed to the command. Return `true` to suppress kebab's default rendering. Return `false` to fall through to it.
+`main.cr` matches `Of(OutputFormat)` and `Of(Int32)` to give a targeted message per target type. The `when` arms cover the failures worth a custom message. Everything else falls to `else`, which prints kebab's default rendering of the error.
 
 ### Other error types
 
-The handler in `main.cr` only intercepts conversion failures. All the other variants (unknown option, missing argument, etc.) hit the `else false` and kebab renders the default. See the `crystal docs` output for the full list.
+The `else` arm catches the variants this CLI doesn't special-case (unknown option, missing argument, etc.) and lets kebab render them. See the `crystal docs` output for the full list.
+
+### Letting commands handle their own errors
+
+In run mode a command can intercept its own errors with `def self.on_parse_error(error, stderr)`, which `Type.run` calls for the responsible command. See [`../suggestions/`](../suggestions/) for that pattern.
