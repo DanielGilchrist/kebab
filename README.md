@@ -49,6 +49,7 @@ Runnable walkthroughs in [`examples/`](examples/):
 - [`examples/command/`](examples/command/) — single-command pattern with `Type.run`.
 - [`examples/subcommands/`](examples/subcommands/) — multi-level command tree.
 - [`examples/errors/`](examples/errors/) — typed error dispatch and in-command handlers.
+- [`examples/suggestions/`](examples/suggestions/) — custom error rendering with "did you mean" hints.
 
 ## Colour
 
