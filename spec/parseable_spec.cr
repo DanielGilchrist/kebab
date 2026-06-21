@@ -316,7 +316,7 @@ describe Kebab::Parseable do
     in Kebab::Schema::Option   then source.long.should eq("weeks")
     in Kebab::Schema::Argument then fail "expected option source"
     end
-    error.should be_a(Kebab::Error::InvalidValue::Typed(Int32, Punch))
+    error.should be_a(Kebab::Error::InvalidValue::Exact(Int32, Punch))
   end
 
   it "narrows InvalidValue by target type via case" do

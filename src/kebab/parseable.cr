@@ -179,7 +179,7 @@ module Kebab
                         end
                         {% if base == Bool %}
                           if %inline = %token.value
-                            __kebab_bail(::Kebab::Error::InvalidValue::Typed(Bool, {{@type}}).new(
+                            __kebab_bail(::Kebab::Error::InvalidValue::Exact(Bool, {{@type}}).new(
                               value: %inline,
                               source: %schema{ivar.name},
                               target_name: "flag",
@@ -239,7 +239,7 @@ module Kebab
                           end
                           {% if base == Bool %}
                             if %last_char && (%inline = %token.value)
-                              __kebab_bail(::Kebab::Error::InvalidValue::Typed(Bool, {{@type}}).new(
+                              __kebab_bail(::Kebab::Error::InvalidValue::Exact(Bool, {{@type}}).new(
                                 value: %inline,
                                 source: %schema{ivar.name},
                                 target_name: "flag",
@@ -608,7 +608,7 @@ module Kebab
             result
           in ::Kebab::Convert::Failure
             {% begin %}
-              __kebab_bail(::Kebab::Error::InvalidValue::Typed(T, {{@type}}).from(result, value: raw, source: source))
+              __kebab_bail(::Kebab::Error::InvalidValue::Exact(T, {{@type}}).from(result, value: raw, source: source))
             {% end %}
           end
         end

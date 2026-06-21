@@ -7,7 +7,7 @@ module Kebab
   module Error
     # A value couldn't be converted to its target type. Dispatchable on
     # value type via `Of(T)`, on command via `For(C)`, or on both via
-    # `Typed(T, C)`.
+    # `Exact(T, C)`.
     abstract struct InvalidValue < Error::Base
       # Marker module included on the concrete error when the command is `C`.
       module For(C); end
@@ -56,7 +56,7 @@ module Kebab
       end
 
       # Concrete subclass parameterised by the target type `T` and the command `C`.
-      struct Typed(T, C) < InvalidValue
+      struct Exact(T, C) < InvalidValue
         include InvalidValue::For(C)
         include InvalidValue::Of(T)
 
