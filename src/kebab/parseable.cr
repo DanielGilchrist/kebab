@@ -3,7 +3,7 @@ require "colorize"
 require "./convert"
 require "./errors"
 require "./help"
-require "./internal"
+require "./parse_exit"
 require "./parseable/schema_check"
 require "./renderer"
 require "./scanner"
@@ -24,7 +24,7 @@ module Kebab
       # variants. Never raises.
       def self.parse(args : Array(String), parent_path : Array(String) = [] of String) : self | ::Kebab::Help | ::Kebab::Errors
         new(__kebab_args: args, __kebab_parent_path: parent_path)
-      rescue ex : ::Kebab::Internal::ParseExit
+      rescue ex : ::Kebab::ParseExit
         ex.result
       end
 
@@ -147,12 +147,12 @@ module Kebab
 
               while %index < args.size
                 %raw = args[%index]
-                %token = %separated ? ::Kebab::Internal::Tokens::Positional.new(%raw) : ::Kebab::Internal::Scanner.scan(%raw)
+                %token = %separated ? ::Kebab::Token::Positional.new(%raw) : ::Kebab::Scanner.scan(%raw)
 
                 case %token
-                in ::Kebab::Internal::Tokens::Separator
+                in ::Kebab::Token::Separator
                   %separated = true
-                in ::Kebab::Internal::Tokens::Long
+                in ::Kebab::Token::Long
                   {% if option_ivars.empty? %}
                     __kebab_bail(::Kebab::Help.new(__kebab_help_text)) if %token.name == "help"
                     __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: %token.to_s, options: __kebab_options_schema, usage: __kebab_usage))
@@ -204,7 +204,7 @@ module Kebab
                       __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: %token.to_s, options: __kebab_options_schema, usage: __kebab_usage))
                     end
                   {% end %}
-                in ::Kebab::Internal::Tokens::Shorts
+                in ::Kebab::Token::Shorts
                   %chars = %token.chars
                   if %chars.empty?
                     __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: "-", options: __kebab_options_schema, usage: __kebab_usage))
@@ -267,7 +267,7 @@ module Kebab
                       end
                     {% end %}
                   end
-                in ::Kebab::Internal::Tokens::Positional
+                in ::Kebab::Token::Positional
                   {% if subcommand_ivar %}
                     case %token.value
                     {% unless user_defined_help_subcommand %}
@@ -580,12 +580,12 @@ module Kebab
         end
 
         private def __kebab_bail(result : ::Kebab::Help | ::Kebab::Errors) : NoReturn
-          raise ::Kebab::Internal::ParseExit.new(result)
+          raise ::Kebab::ParseExit.new(result)
         end
 
         private def __kebab_next_value(args : Array(String), index : Int32, separated : Bool, option : ::Kebab::Schema::Option) : String
           next_raw = args[index + 1]?
-          if next_raw.nil? || (!separated && !::Kebab::Internal::Scanner.scan(next_raw).is_a?(::Kebab::Internal::Tokens::Positional))
+          if next_raw.nil? || (!separated && !::Kebab::Scanner.scan(next_raw).is_a?(::Kebab::Token::Positional))
             {% begin %}
               __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(option, options: __kebab_options_schema, usage: __kebab_usage))
             {% end %}

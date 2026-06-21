@@ -1,11 +1,11 @@
-require "./tokens/long"
-require "./tokens/positional"
-require "./tokens/separator"
-require "./tokens/shorts"
+require "./token/long"
+require "./token/positional"
+require "./token/separator"
+require "./token/shorts"
 
 module Kebab
-  module Internal
-    # :nodoc:
-    alias Token = Tokens::Long | Tokens::Shorts | Tokens::Positional | Tokens::Separator
+  # :nodoc:
+  module Token
+    alias Any = Long | Shorts | Positional | Separator
   end
 end
