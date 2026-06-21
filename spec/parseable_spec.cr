@@ -270,10 +270,10 @@ describe Kebab::Parseable do
     error.option.long.should eq("at")
   end
 
-  it "carries the full option set and usage on MissingValue" do
+  it "carries the command schema on MissingValue" do
     error = parse_punch_error!(["--at"]).as(Kebab::Error::MissingValue)
-    error.options.map(&.long).should contain("at")
-    error.usage.command_path.should eq(["punch"])
+    error.schema.options.map(&.long).should contain("at")
+    error.schema.path.should eq(["punch"])
     error.to_s.should contain("Usage: punch")
     error.to_s.should contain("Options:")
   end
@@ -283,10 +283,10 @@ describe Kebab::Parseable do
     error.option.long.should eq("at")
   end
 
-  it "carries the full option set and usage on RepeatedOption" do
+  it "carries the command schema on RepeatedOption" do
     error = parse_punch_error!(["--at", "8:45", "--at", "9:30"]).as(Kebab::Error::RepeatedOption)
-    error.options.map(&.long).should contain("at")
-    error.usage.command_path.should eq(["punch"])
+    error.schema.options.map(&.long).should contain("at")
+    error.schema.path.should eq(["punch"])
     error.to_s.should contain("Usage: punch")
     error.to_s.should contain("Options:")
   end

@@ -1,32 +1,28 @@
 require "../renderer"
-require "../schema/argument"
-require "../schema/usage/arguments"
+require "../schema/command"
 require "./base"
 
 module Kebab
   module Error
     # The user passed more positionals than the command declared.
     abstract struct UnexpectedArgument < Error::Base
-      def initialize(@value : String, @arguments : Array(Schema::Argument), @usage : Schema::Usage::Arguments)
+      def initialize(@value : String, @schema : Schema::Command)
         super("\"#{@value}\" wasn't expected here.")
       end
 
       # The first unexpected positional value.
       getter value : String
 
-      # The arguments the command accepts.
-      getter arguments : Array(Schema::Argument)
-
-      # The Usage line for the command.
-      getter usage : Schema::Usage::Arguments
+      # The command being parsed when the error fired.
+      getter schema : Schema::Command
 
       def to_s(io : IO) : Nil
         super(io)
         io << "\n\n"
-        Renderer.usage(io, @usage)
-        unless @arguments.empty?
+        Renderer.usage(io, @schema.usage)
+        unless @schema.arguments.empty?
           io << "\n\n"
-          Renderer.section(io, "Arguments:", @arguments)
+          Renderer.section(io, "Arguments:", @schema.arguments)
         end
       end
 

@@ -23,12 +23,6 @@ module Kebab
       )
       end
 
-      # Builds a bare node carrying only a name and summary. Used where a
-      # command is referenced as a row (e.g. a "Commands:" section entry).
-      def self.new(name : String, summary : String) : self
-        new(path: [name], summary: summary)
-      end
-
       # Path of command names from the binary down to this command
       # (e.g. `["tasks", "add"]`).
       getter path : Array(String)

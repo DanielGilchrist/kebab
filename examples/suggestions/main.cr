@@ -24,7 +24,7 @@ struct Deploy
     case error
     when Kebab::Error::UnknownOption
       name = error.input.lstrip('-')
-      stderr.puts "unknown option: #{error.input}#{Suggest.hint(name, error.options.map(&.long))}"
+      stderr.puts "unknown option: #{error.input}#{Suggest.hint(name, error.schema.options.map(&.long))}"
       true
     else
       false
@@ -64,7 +64,7 @@ struct Fleet
   def self.on_parse_error(error : Kebab::Errors, stderr : IO) : Bool
     case error
     when Kebab::Error::UnknownCommand
-      stderr.puts "unknown command: #{error.input}#{Suggest.hint(error.input, error.commands.map(&.name))}"
+      stderr.puts "unknown command: #{error.input}#{Suggest.hint(error.input, error.schema.subcommands.map(&.name))}"
       true
     else
       false
