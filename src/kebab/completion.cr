@@ -2,18 +2,8 @@ require "./schema/command"
 
 module Kebab
   # Generates shell completion scripts from a command's `Schema::Command`.
-  # Built-in shells are in `Shell`; to add another, implement `Generator`.
+  # Built-in shells are in `Shell`.
   module Completion
-    # Implement this to add a shell beyond those in `Shell`.
-    module Generator
-      # The completion script for `command`. `binary` is the command name the
-      # script registers against; defaults to the command's own name.
-      abstract def generate(command : ::Kebab::Schema::Command, binary : String? = nil) : String
-
-      # The file name the script installs as, e.g. `"todo.fish"` or `"_todo"`.
-      abstract def file_name(binary : String) : String
-    end
-
     # The shells kebab ships generators for.
     enum Shell
       Fish

@@ -116,8 +116,9 @@ eval "$(todo completions bash)"         # bash, in ~/.bashrc
 source <(todo completions zsh)          # zsh, in ~/.zshrc after compinit
 ```
 
-To support another shell, implement `Kebab::Completion::Generator` and dispatch
-to it from your own shell enum. See [`examples/completions/`](examples/completions/).
+To support another shell, write a generator (any type with
+`generate(command, binary)`) and dispatch to it from your own shell enum. See
+[`examples/completions/`](examples/completions/).
 
 ## Command structure
 

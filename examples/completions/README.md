@@ -19,10 +19,10 @@ crystal run main.cr -- list --all
 
 ## How it works
 
-The shell is a typed argument: `getter shell : Kebab::Completion::Shell`, parsed with `Kebab::Convert::Enum`. An unknown shell fails at parse time with `one of: fish, bash, zsh`, so there is no string matching or error handling to write. `run` is one line:
+The shell is a typed argument: `getter shell : Kebab::Completion::Shell`, parsed with `Kebab::Convert::Enum`. An unknown shell fails at parse time with `one of: fish, bash, zsh`, so there is no string matching to write. The parsed command is handled in the `case`:
 
 ```crystal
-puts shell.generate(Todo.schema)
+in Completions then puts sub.shell.generate(Todo.schema)
 ```
 
 `Todo.schema` is the same command structure that drives help, so subcommands, options, and descriptions all come through.
@@ -44,13 +44,13 @@ source <(todo completions zsh)
 
 ## Adding a shell kebab doesn't ship
 
-Implement `Kebab::Completion::Generator`, then dispatch to it from your own shell enum alongside the built-ins:
+A generator is any type with `generate(command : Kebab::Schema::Command, binary : String? = nil) : String`. Write one, then dispatch to it from your own shell enum alongside the built-ins:
 
 ```crystal
-struct Nushell::Completion
-  include Kebab::Completion::Generator
-  def generate(command : Kebab::Schema::Command, binary : String? = nil) : String ; end
-  def file_name(binary : String) : String ; "#{binary}.nu" ; end
+module Nushell
+  def self.generate(command : Kebab::Schema::Command, binary : String? = nil) : String
+    # walk command.subcommands and command.options
+  end
 end
 
 enum AppShell
@@ -60,7 +60,7 @@ enum AppShell
   def generate(command : Kebab::Schema::Command, binary : String? = nil) : String
     case self
     in Fish then Kebab::Completion::Shell::Fish.generate(command, binary)
-    in Nu   then Nushell::Completion.new.generate(command, binary)
+    in Nu   then Nushell.generate(command, binary)
     end
   end
 end
