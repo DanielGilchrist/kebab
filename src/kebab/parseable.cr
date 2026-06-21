@@ -647,35 +647,30 @@ module Kebab
         end
 
         private def __kebab_help_text : String
-          {% begin %}
-            {% command = @type.annotation(::Kebab::Command) %}
-            {% summary = command && command[:summary] %}
+          node = self.class.schema(@__kebab_parent_path)
 
-            ::String.build do |%io|
-              {% if summary %}
-                %io << {{summary}} << "\n\n"
-              {% end %}
-
-              ::Kebab::Renderer.usage(%io, __kebab_usage)
-
-              %arguments = __kebab_arguments_schema
-              unless %arguments.empty?
-                %io << "\n\n"
-                ::Kebab::Renderer.section(%io, "Arguments:", %arguments)
-              end
-
-              %commands = __kebab_commands_schema
-              unless %commands.empty?
-                %io << "\n\n"
-                ::Kebab::Renderer.section(%io, "Commands:", %commands)
-              end
-
-              %io << "\n\n"
-              ::Kebab::Renderer.section(%io, "Options:", __kebab_options_schema)
-
-              %io << '\n'
+          ::String.build do |io|
+            unless node.summary.empty?
+              io << node.summary << "\n\n"
             end
-          {% end %}
+
+            ::Kebab::Renderer.usage(io, node.usage)
+
+            unless node.arguments.empty?
+              io << "\n\n"
+              ::Kebab::Renderer.section(io, "Arguments:", node.arguments)
+            end
+
+            unless node.subcommands.empty?
+              io << "\n\n"
+              ::Kebab::Renderer.section(io, "Commands:", node.subcommands)
+            end
+
+            io << "\n\n"
+            ::Kebab::Renderer.section(io, "Options:", node.options)
+
+            io << '\n'
+          end
         end
 
         private def __kebab_bail(result : ::Kebab::Help | ::Kebab::Errors) : NoReturn
