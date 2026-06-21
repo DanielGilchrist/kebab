@@ -1,28 +1,24 @@
 require "../renderer"
 require "../schema/command"
-require "../schema/usage/subcommand"
 require "./base"
 
 module Kebab
   module Error
     # A required subcommand wasn't provided.
     abstract struct MissingCommand < Error::Base
-      def initialize(@commands : Array(Schema::Command), @usage : Schema::Usage::Subcommand)
+      def initialize(@schema : Schema::Command)
         super("a command is required.")
       end
 
-      # The subcommands the parent accepts.
-      getter commands : Array(Schema::Command)
-
-      # The Usage line for the parent command.
-      getter usage : Schema::Usage::Subcommand
+      # The parent command being parsed when the error fired.
+      getter schema : Schema::Command
 
       def to_s(io : IO) : Nil
         super(io)
         io << "\n\n"
-        Renderer.usage(io, @usage)
+        Renderer.usage(io, @schema.usage)
         io << "\n\n"
-        Renderer.section(io, "Commands:", @commands)
+        Renderer.section(io, "Commands:", @schema.subcommands)
       end
 
       # Concrete subclass parameterised by the parent command `C`.

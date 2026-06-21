@@ -2,8 +2,6 @@ require "levenshtein"
 
 require "../../src/kebab"
 
-# Builds the "did you mean" hint shared by the handlers below. Returns an
-# empty string when nothing is close enough.
 module Suggest
   def self.hint(input : String, candidates : Enumerable(String)) : String
     if guess = Levenshtein.find(input, candidates)
@@ -14,7 +12,7 @@ module Suggest
   end
 end
 
-@[Kebab::Command(name: "deploy", summary: "Deploy a service")]
+@[Kebab::Command(summary: "Deploy a service")]
 struct Deploy
   include Kebab::Parseable
 
@@ -24,7 +22,7 @@ struct Deploy
     case error
     when Kebab::Error::UnknownOption
       name = error.input.lstrip('-')
-      stderr.puts "unknown option: #{error.input}#{Suggest.hint(name, error.options.map(&.long))}"
+      stderr.puts "unknown option: #{error.input}#{Suggest.hint(name, error.schema.options.map(&.long))}"
       true
     else
       false
@@ -45,7 +43,7 @@ struct Deploy
   end
 end
 
-@[Kebab::Command(name: "status", summary: "Show deployment status")]
+@[Kebab::Command(summary: "Show deployment status")]
 struct Status
   include Kebab::Parseable
 
@@ -57,14 +55,14 @@ struct Status
   end
 end
 
-@[Kebab::Command(name: "fleet", summary: "Manage a fleet of services")]
+@[Kebab::Command(summary: "Manage a fleet of services")]
 struct Fleet
   include Kebab::Parseable
 
   def self.on_parse_error(error : Kebab::Errors, stderr : IO) : Bool
     case error
     when Kebab::Error::UnknownCommand
-      stderr.puts "unknown command: #{error.input}#{Suggest.hint(error.input, error.commands.map(&.name))}"
+      stderr.puts "unknown command: #{error.input}#{Suggest.hint(error.input, error.schema.subcommands.map(&.name))}"
       true
     else
       false

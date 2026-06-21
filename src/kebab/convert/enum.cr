@@ -8,7 +8,10 @@ module Kebab
     # `MyEnum::Json`).
     module Enum(T)
       def self.parse(input : String) : T | ::Kebab::Convert::Failure
-        T.parse?(input) || ::Kebab::Convert.failure("one of: #{T.names.map(&.downcase).join(", ")}")
+        T.parse?(input) || ::Kebab::Convert.failure(
+          "one of: #{T.names.map(&.downcase).join(", ")}",
+          name: T.name.split("::").last.underscore.tr("_", " "),
+        )
       end
     end
   end

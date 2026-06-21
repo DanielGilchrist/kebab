@@ -27,12 +27,12 @@ crystal run main.cr -- deploy
 
 ### Building the message
 
-Each error carries the context needed to render it:
+Each error carries `input` (the token the user typed) and `schema` (the command being parsed). The handlers pull the candidates from the schema:
 
-- `UnknownCommand` has `input` (the typed token) and `commands` (the valid subcommands).
-- `UnknownOption` has `input` (with the leading dashes) and `options` (the declared options).
+- `UnknownCommand` → `error.schema.subcommands` (the valid subcommands).
+- `UnknownOption` → `error.schema.options` (the declared options).
 
-The handlers feed the candidate names to `Levenshtein.find`, which returns the nearest match within its tolerance or `nil`. A `nil` means nothing was close, so no hint is shown.
+Those candidates feed `Levenshtein.find`, which returns the nearest match within its tolerance or `nil`. A `nil` means nothing was close, so no hint is shown.
 
 ### Falling through
 

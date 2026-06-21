@@ -1,31 +1,27 @@
 require "../renderer"
-require "../schema/option"
-require "../schema/usage"
+require "../schema/command"
 require "./base"
 
 module Kebab
   module Error
     # The user typed an option flag that doesn't match any declared option.
     abstract struct UnknownOption < Error::Base
-      def initialize(@input : String, @options : Array(Schema::Option), @usage : Schema::Usage::Any)
+      def initialize(@input : String, @schema : Schema::Command)
         super("\"#{@input}\" isn't a recognised option.")
       end
 
       # The token the user typed (e.g. `"--bogus"` or `"-z"`).
       getter input : String
 
-      # The options the command accepts.
-      getter options : Array(Schema::Option)
-
-      # The Usage line for the command.
-      getter usage : Schema::Usage::Any
+      # The command being parsed when the error fired.
+      getter schema : Schema::Command
 
       def to_s(io : IO) : Nil
         super(io)
         io << "\n\n"
-        Renderer.usage(io, @usage)
+        Renderer.usage(io, @schema.usage)
         io << "\n\n"
-        Renderer.section(io, "Options:", @options)
+        Renderer.section(io, "Options:", @schema.options)
       end
 
       # Concrete subclass parameterised by the command `C`.

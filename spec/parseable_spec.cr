@@ -270,10 +270,10 @@ describe Kebab::Parseable do
     error.option.long.should eq("at")
   end
 
-  it "carries the full option set and usage on MissingValue" do
+  it "carries the command schema on MissingValue" do
     error = parse_punch_error!(["--at"]).as(Kebab::Error::MissingValue)
-    error.options.map(&.long).should contain("at")
-    error.usage.command_path.should eq(["punch"])
+    error.schema.options.map(&.long).should contain("at")
+    error.schema.path.should eq(["punch"])
     error.to_s.should contain("Usage: punch")
     error.to_s.should contain("Options:")
   end
@@ -283,10 +283,10 @@ describe Kebab::Parseable do
     error.option.long.should eq("at")
   end
 
-  it "carries the full option set and usage on RepeatedOption" do
+  it "carries the command schema on RepeatedOption" do
     error = parse_punch_error!(["--at", "8:45", "--at", "9:30"]).as(Kebab::Error::RepeatedOption)
-    error.options.map(&.long).should contain("at")
-    error.usage.command_path.should eq(["punch"])
+    error.schema.options.map(&.long).should contain("at")
+    error.schema.path.should eq(["punch"])
     error.to_s.should contain("Usage: punch")
     error.to_s.should contain("Options:")
   end
@@ -317,6 +317,18 @@ describe Kebab::Parseable do
     in Kebab::Schema::Argument then fail "expected option source"
     end
     error.should be_a(Kebab::Error::InvalidValue::Exact(Int32, Punch))
+  end
+
+  it "carries the command schema on InvalidValue" do
+    error = parse_punch_error!(["--weeks", "potato"]).as(Kebab::Error::InvalidValue)
+    error.schema.path.should eq(["punch"])
+    error.schema.options.map(&.long).should contain("weeks")
+  end
+
+  it "carries the command schema on UnknownOption" do
+    error = parse_punch_error!(["--nope"]).as(Kebab::Error::UnknownOption)
+    error.schema.path.should eq(["punch"])
+    error.schema.options.map(&.long).should contain("at")
   end
 
   it "narrows InvalidValue by target type via case" do
@@ -502,6 +514,7 @@ describe Kebab::Convert::Enum do
     error.reason.should eq("one of: json, yaml, text")
     error.value.should eq("xml")
     error.target_type_name.should eq("SpecOutputFormat")
+    error.target_name.should eq("spec output format")
     case source = error.source
     in Kebab::Schema::Option   then source.long.should eq("format")
     in Kebab::Schema::Argument then fail "expected option source"

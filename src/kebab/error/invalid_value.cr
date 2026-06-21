@@ -1,5 +1,6 @@
 require "../convert/failure"
 require "../schema/argument"
+require "../schema/command"
 require "../schema/option"
 require "./base"
 
@@ -15,7 +16,7 @@ module Kebab
       # Marker module included on the concrete error when the target type is `T`.
       module Of(T); end
 
-      def initialize(@value : String, @source : Schema::Option | Schema::Argument, @target_name : String? = nil, @reason : String? = nil)
+      def initialize(@value : String, @source : Schema::Option | Schema::Argument, @schema : Schema::Command, @target_name : String? = nil, @reason : String? = nil)
         super(build_message)
       end
 
@@ -24,6 +25,9 @@ module Kebab
 
       # The option or argument the value was being parsed for.
       getter source : Schema::Option | Schema::Argument
+
+      # The command being parsed when the error fired.
+      getter schema : Schema::Command
 
       # Human-readable noun for the target type, supplied by the converter
       # (e.g. `"whole number"`). Nil falls back to the type's class name.
@@ -60,10 +64,11 @@ module Kebab
         include InvalidValue::For(C)
         include InvalidValue::Of(T)
 
-        def self.from(failure : ::Kebab::Convert::Failure, *, value : String, source : Schema::Option | Schema::Argument) : self
+        def self.from(failure : ::Kebab::Convert::Failure, *, value : String, source : Schema::Option | Schema::Argument, schema : ::Kebab::Schema::Command) : self
           new(
             value: value,
             source: source,
+            schema: schema,
             target_name: failure.name,
             reason: failure.reason,
           )

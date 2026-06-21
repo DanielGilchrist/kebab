@@ -26,7 +26,6 @@ in Query
 in Kebab::Help
   puts result
 in Kebab::Errors
-  # Errors are values, so dispatch on the type of failure.
   case result
   when Kebab::Error::InvalidValue::Of(OutputFormat)
     STDERR.puts "format must be one of: #{OutputFormat.names.map(&.downcase).join(", ")}"

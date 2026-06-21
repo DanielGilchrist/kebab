@@ -86,6 +86,47 @@ Runnable walkthroughs in [`examples/`](examples/):
 - [`examples/subcommands/`](examples/subcommands/) — multi-level command tree.
 - [`examples/errors/`](examples/errors/) — typed error dispatch in parsing mode.
 - [`examples/suggestions/`](examples/suggestions/) — in-command error handlers with "did you mean" hints.
+- [`examples/completions/`](examples/completions/) — generating fish, bash, and zsh completions.
+
+## Shell completion
+
+`Kebab::Completion::Shell` generates completion scripts for fish, bash, and
+zsh. Expose it as a subcommand with a typed shell argument:
+
+```crystal
+@[Kebab::Command(summary: "Print a shell completion script")]
+struct Completions
+  include Kebab::Parseable
+
+  @[Kebab::Argument(converter: Kebab::Convert::Enum(Kebab::Completion::Shell))]
+  getter shell : Kebab::Completion::Shell
+
+  def run : Nil
+    puts shell.generate(Todo.schema)
+  end
+end
+```
+
+An unknown shell is a parse error listing the valid ones. Source the script at
+shell startup so it tracks the current binary:
+
+```sh
+todo completions fish | source          # fish
+eval "$(todo completions bash)"         # bash, in ~/.bashrc
+source <(todo completions zsh)          # zsh, in ~/.zshrc after compinit
+```
+
+The enum is a convenience, not a requirement. A completion script is built from
+`Type.schema`, so a shell kebab doesn't ship is just a script you generate from
+it yourself, dispatched however you like. See
+[`examples/completions/`](examples/completions/).
+
+## Command structure
+
+`Type.schema` returns the command and its subcommands as a
+`Kebab::Schema::Command` (options, arguments, subcommands, usage). It drives
+help and completion, is carried on every parse error as `error.schema`, and you
+can walk it for your own tooling.
 
 ## Colour
 
