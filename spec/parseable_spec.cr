@@ -514,6 +514,7 @@ describe Kebab::Convert::Enum do
     error.reason.should eq("one of: json, yaml, text")
     error.value.should eq("xml")
     error.target_type_name.should eq("SpecOutputFormat")
+    error.target_name.should eq("spec output format")
     case source = error.source
     in Kebab::Schema::Option   then source.long.should eq("format")
     in Kebab::Schema::Argument then fail "expected option source"
