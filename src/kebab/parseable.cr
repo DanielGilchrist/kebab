@@ -147,12 +147,12 @@ module Kebab
 
               while %index < args.size
                 %raw = args[%index]
-                %token = %separated ? ::Kebab::Tokens::Positional.new(%raw) : ::Kebab::Scanner.scan(%raw)
+                %token = %separated ? ::Kebab::Internal::Tokens::Positional.new(%raw) : ::Kebab::Internal::Scanner.scan(%raw)
 
                 case %token
-                in ::Kebab::Tokens::Separator
+                in ::Kebab::Internal::Tokens::Separator
                   %separated = true
-                in ::Kebab::Tokens::Long
+                in ::Kebab::Internal::Tokens::Long
                   {% if option_ivars.empty? %}
                     __kebab_bail(::Kebab::Help.new(__kebab_help_text)) if %token.name == "help"
                     __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: %token.to_s, options: __kebab_options_schema, usage: __kebab_usage))
@@ -204,7 +204,7 @@ module Kebab
                       __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: %token.to_s, options: __kebab_options_schema, usage: __kebab_usage))
                     end
                   {% end %}
-                in ::Kebab::Tokens::Shorts
+                in ::Kebab::Internal::Tokens::Shorts
                   %chars = %token.chars
                   if %chars.empty?
                     __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: "-", options: __kebab_options_schema, usage: __kebab_usage))
@@ -267,7 +267,7 @@ module Kebab
                       end
                     {% end %}
                   end
-                in ::Kebab::Tokens::Positional
+                in ::Kebab::Internal::Tokens::Positional
                   {% if subcommand_ivar %}
                     case %token.value
                     {% unless user_defined_help_subcommand %}
@@ -585,7 +585,7 @@ module Kebab
 
         private def __kebab_next_value(args : Array(String), index : Int32, separated : Bool, option : ::Kebab::Schema::Option) : String
           next_raw = args[index + 1]?
-          if next_raw.nil? || (!separated && !::Kebab::Scanner.scan(next_raw).is_a?(::Kebab::Tokens::Positional))
+          if next_raw.nil? || (!separated && !::Kebab::Internal::Scanner.scan(next_raw).is_a?(::Kebab::Internal::Tokens::Positional))
             {% begin %}
               __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(option, options: __kebab_options_schema, usage: __kebab_usage))
             {% end %}

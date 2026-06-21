@@ -6,6 +6,7 @@ require "./schema/option"
 require "./schema/usage"
 
 module Kebab
+  # :nodoc:
   module Renderer
     extend self
 
