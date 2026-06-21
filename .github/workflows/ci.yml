@@ -49,8 +49,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest]
         crystal: ["1.20.0", latest, nightly]
+        include:
+          - { os: macos-latest, crystal: latest }
 
     runs-on: ${{ matrix.os }}
     continue-on-error: ${{ matrix.crystal == 'nightly' }}
