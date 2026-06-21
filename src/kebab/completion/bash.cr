@@ -2,10 +2,9 @@ require "../schema/command"
 
 module Kebab
   module Completion
-    # :nodoc:
-    #
-    # Builds a `__`-joined key from the non-option words typed so far, then
-    # offers that command's subcommands and option flags via `compgen`.
+    # Generates a bash completion script. Builds a `__`-joined key from the
+    # non-option words typed so far, then offers that command's subcommands and
+    # option flags via `compgen`.
     module Bash
       extend self
 

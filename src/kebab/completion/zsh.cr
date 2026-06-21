@@ -2,11 +2,9 @@ require "../schema/command"
 
 module Kebab
   module Completion
-    # :nodoc:
-    #
-    # Same path-key dispatch as bash, adding candidates with `compadd`. The
-    # trailer registers the function whether the file is autoloaded from
-    # `$fpath` or sourced directly.
+    # Generates a zsh completion script. Same path-key dispatch as bash, adding
+    # candidates with `compadd`. The trailer registers the function whether the
+    # file is autoloaded from `$fpath` or sourced directly.
     module Zsh
       extend self
 

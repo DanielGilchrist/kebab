@@ -2,7 +2,7 @@ require "../schema/command"
 
 module Kebab
   module Completion
-    # :nodoc:
+    # Generates a fish completion script from a command's `Schema::Command`.
     module Fish
       extend self
 

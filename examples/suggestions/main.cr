@@ -2,8 +2,6 @@ require "levenshtein"
 
 require "../../src/kebab"
 
-# Builds the "did you mean" hint shared by the handlers below. Returns an
-# empty string when nothing is close enough.
 module Suggest
   def self.hint(input : String, candidates : Enumerable(String)) : String
     if guess = Levenshtein.find(input, candidates)

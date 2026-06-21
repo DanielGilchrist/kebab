@@ -61,7 +61,7 @@ enum AppShell
 
   def generate(command : Kebab::Schema::Command, binary : String? = nil) : String
     case self
-    in Fish then Kebab::Completion::Shell::Fish.generate(command, binary)  # reuse a built-in
+    in Fish then Kebab::Completion::Fish.generate(command, binary)  # reuse a built-in
     in Nu   then Nushell.generate(command, binary)                          # your own
     end
   end
