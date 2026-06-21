@@ -16,7 +16,7 @@ struct List
   getter? all : Bool = false
 end
 
-@[Kebab::Command(name: "tasks", summary: "A tiny todo app")]
+@[Kebab::Command(summary: "A tiny todo app")]
 struct Tasks
   include Kebab::Parseable
 

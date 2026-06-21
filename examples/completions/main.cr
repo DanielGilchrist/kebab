@@ -1,6 +1,6 @@
 require "../../src/kebab"
 
-@[Kebab::Command(name: "add", summary: "Add a task")]
+@[Kebab::Command(summary: "Add a task")]
 struct Add
   include Kebab::Parseable
 
@@ -11,7 +11,7 @@ struct Add
   getter priority : Int32 = 1
 end
 
-@[Kebab::Command(name: "list", summary: "List tasks")]
+@[Kebab::Command(summary: "List tasks")]
 struct List
   include Kebab::Parseable
 
@@ -19,7 +19,7 @@ struct List
   getter? all : Bool = false
 end
 
-@[Kebab::Command(name: "completions", summary: "Print a shell completion script")]
+@[Kebab::Command(summary: "Print a shell completion script")]
 struct Completions
   include Kebab::Parseable
 
@@ -27,7 +27,7 @@ struct Completions
   getter shell : Kebab::Completion::Shell
 end
 
-@[Kebab::Command(name: "todo", summary: "A tiny todo app")]
+@[Kebab::Command(summary: "A tiny todo app")]
 struct Todo
   include Kebab::Parseable
 

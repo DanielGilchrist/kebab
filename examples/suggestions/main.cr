@@ -14,7 +14,7 @@ module Suggest
   end
 end
 
-@[Kebab::Command(name: "deploy", summary: "Deploy a service")]
+@[Kebab::Command(summary: "Deploy a service")]
 struct Deploy
   include Kebab::Parseable
 
@@ -45,7 +45,7 @@ struct Deploy
   end
 end
 
-@[Kebab::Command(name: "status", summary: "Show deployment status")]
+@[Kebab::Command(summary: "Show deployment status")]
 struct Status
   include Kebab::Parseable
 
@@ -57,7 +57,7 @@ struct Status
   end
 end
 
-@[Kebab::Command(name: "fleet", summary: "Manage a fleet of services")]
+@[Kebab::Command(summary: "Manage a fleet of services")]
 struct Fleet
   include Kebab::Parseable
 

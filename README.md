@@ -94,7 +94,7 @@ Runnable walkthroughs in [`examples/`](examples/):
 zsh. Expose it as a subcommand with a typed shell argument:
 
 ```crystal
-@[Kebab::Command(name: "completions", summary: "Print a shell completion script")]
+@[Kebab::Command(summary: "Print a shell completion script")]
 struct Completions
   include Kebab::Parseable
 
