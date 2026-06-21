@@ -19,10 +19,21 @@ crystal run main.cr -- list --all
 
 ## How it works
 
-The shell is a typed argument: `getter shell : Kebab::Completion::Shell`, parsed with `Kebab::Convert::Enum`. An unknown shell fails at parse time with `one of: fish, bash, zsh`, so there is no string matching to write. The parsed command is handled in the `case`:
+The shell is a typed argument: `getter shell : Kebab::Completion::Shell`, parsed with `Kebab::Convert::Enum`. An unknown shell fails at parse time with `one of: fish, bash, zsh`, so there is no string matching to write.
+
+`Todo.parse` returns the parsed command, and the `completions` subcommand is handled like any other:
 
 ```crystal
-in Completions then puts sub.shell.generate(Todo.schema)
+case result = Todo.parse(ARGV)
+in Todo
+  case sub = result.command
+  in Add         then # ...
+  in List        then # ...
+  in Completions then puts sub.shell.generate(Todo.schema)
+  end
+in Kebab::Help   then puts result
+in Kebab::Errors then STDERR.puts(result)
+end
 ```
 
 `Todo.schema` is the same command structure that drives help, so subcommands, options, and descriptions all come through.
