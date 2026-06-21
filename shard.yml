@@ -1,7 +1,7 @@
 name: kebab
 version: 0.1.0
 
-description: A type-safe CLI parser for Crystal
+description: Declarative, type-safe command line parsing for Crystal
 
 authors:
   - Daniel Gilchrist <danniieelg@gmail.com>
@@ -9,3 +9,13 @@ authors:
 crystal: ">= 1.20.0"
 
 license: MIT
+
+repository: https://github.com/DanielGilchrist/kebab
+homepage: https://github.com/DanielGilchrist/kebab
+documentation: https://danielgilchrist.github.io/kebab
+
+development_dependencies:
+  ameba:
+    github: crystal-ameba/ameba
+    version: ~> 1.6
+

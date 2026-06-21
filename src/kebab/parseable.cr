@@ -13,23 +13,33 @@ require "./schema/option"
 require "./schema/usage"
 
 module Kebab
+  # Included on a `struct` to make it parseable from `Array(String)` args.
+  # See the project README for examples.
   module Parseable
     macro included
       @__kebab_parent_path : Array(String) = [] of String
 
+      # Parses `args` into either an instance of `self`, a `Kebab::Help`
+      # (if the user asked for help), or one of the `Kebab::Errors`
+      # variants. Never raises.
       def self.parse(args : Array(String), parent_path : Array(String) = [] of String) : self | ::Kebab::Help | ::Kebab::Errors
         new(__kebab_args: args, __kebab_parent_path: parent_path)
       rescue ex : ::Kebab::Internal::ParseExit
         ex.result
       end
 
+      # Parses `args` and dispatches: calls `instance.run(*forward_args, **forward_kwargs)`
+      # on success, writes help to `stdout`, writes errors to `stderr`.
+      # Returns `true` on success or help, `false` on error.
+      # Define `self.on_parse_error` on a command to customise how errors for that command are rendered.
       def self.run(args : Array(String), *forward_args, stdout : IO = STDOUT, stderr : IO = STDERR, **forward_kwargs) : Bool
         case result = parse(args)
         when ::Kebab::Help
           stdout.puts(result)
           true
         when ::Kebab::Errors
-          stderr.puts(result)
+          handled = __kebab_route_error(result, stderr)
+          stderr.puts(result) unless handled
           false
         else
           result.run(*forward_args, **forward_kwargs)
@@ -37,7 +47,33 @@ module Kebab
         end
       end
 
+      # Override this on a command to customise how its parse errors are
+      # rendered when invoked through `self.run`. Return `true` to suppress
+      # kebab's default rendering, `false` to fall through to it.
+      def self.on_parse_error(error : ::Kebab::Errors, stderr : ::IO) : Bool
+        false
+      end
+
       {% verbatim do %}
+        def self.__kebab_route_error(error : ::Kebab::Errors, stderr : ::IO) : Bool
+          target = error.command
+          return on_parse_error(error, stderr) if target == self
+
+          {% begin %}
+            {% subcommand_ivar = @type.instance_vars.find(&.annotation(::Kebab::Subcommand)) %}
+            {% if subcommand_ivar %}
+              {% members = subcommand_ivar.type.union? ? subcommand_ivar.type.union_types.reject { |union_type| union_type == Nil } : [subcommand_ivar.type] %}
+              {% for member in members %}
+                if {{member}}.__kebab_route_error(error, stderr)
+                  return true
+                end
+              {% end %}
+            {% end %}
+          {% end %}
+
+          false
+        end
+
         def initialize(*, __kebab_args args : Array(String), __kebab_parent_path parent_path : Array(String) = [] of String)
           @__kebab_parent_path = parent_path
           __kebab_validate_schema
@@ -119,36 +155,44 @@ module Kebab
                 in ::Kebab::Tokens::Long
                   {% if option_ivars.empty? %}
                     __kebab_bail(::Kebab::Help.new(__kebab_help_text)) if %token.name == "help"
-                    __kebab_bail(::Kebab::Error::UnknownOption.new(%token.to_s, __kebab_options_schema, __kebab_usage))
+                    __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: %token.to_s, options: __kebab_options_schema, usage: __kebab_usage))
                   {% else %}
                     case %token.name
                     {% for ivar in option_ivars %}
                       {%
                         option = ivar.annotation(::Kebab::Option)
                         long = (option && option[:long]) || ivar.name.stringify.gsub(/_/, "-")
+                        short = option && option[:short]
+                        description = (option && option[:description]) || ""
                         converter = option && option[:converter]
                         base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
                       %}
                       when {{long}}
+                        %schema{ivar.name} = ::Kebab::Schema::Option.new(
+                          long: {{long}},
+                          short: {{short}},
+                          description: {{description}},
+                          takes_value: {{base != Bool}},
+                        )
                         unless %value{ivar.name}.nil?
-                          __kebab_bail(::Kebab::Error::RepeatedOption.new("--#{{{long}}}"))
+                          __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}, options: __kebab_options_schema, usage: __kebab_usage))
                         end
                         {% if base == Bool %}
                           if %inline = %token.value
-                            __kebab_bail(::Kebab::Error::InvalidValueOf(Bool).new(
+                            __kebab_bail(::Kebab::Error::InvalidValue::Typed(Bool, {{@type}}).new(
                               value: %inline,
-                              option: "--#{{{long}}}",
+                              source: %schema{ivar.name},
                               target_name: "flag",
                               reason: "flags don't accept inline values",
                             ))
                           end
                           %value{ivar.name} = true
                         {% else %}
-                          %raw_value = %token.value || __kebab_next_value(args, %index, %separated, "--#{{{long}}}").tap { %index += 1 }
+                          %raw_value = %token.value || __kebab_next_value(args, %index, %separated, %schema{ivar.name}).tap { %index += 1 }
                           {% if converter %}
-                            %value{ivar.name} = __kebab_convert({{base}}, "--#{{{long}}}", %raw_value, converter: {{converter}})
+                            %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %raw_value, converter: {{converter}})
                           {% else %}
-                            %value{ivar.name} = __kebab_convert({{base}}, "--#{{{long}}}", %raw_value)
+                            %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %raw_value)
                           {% end %}
                         {% end %}
                     {% end %}
@@ -157,13 +201,13 @@ module Kebab
                         __kebab_bail(::Kebab::Help.new(__kebab_help_text))
                     {% end %}
                     else
-                      __kebab_bail(::Kebab::Error::UnknownOption.new(%token.to_s, __kebab_options_schema, __kebab_usage))
+                      __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: %token.to_s, options: __kebab_options_schema, usage: __kebab_usage))
                     end
                   {% end %}
                 in ::Kebab::Tokens::Shorts
                   %chars = %token.chars
                   if %chars.empty?
-                    __kebab_bail(::Kebab::Error::UnknownOption.new("-", __kebab_options_schema, __kebab_usage))
+                    __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: "-", options: __kebab_options_schema, usage: __kebab_usage))
                   end
                   %chars.each_char_with_index do |%char, %char_index|
                     %last_char = %char_index == %chars.size - 1
@@ -171,38 +215,46 @@ module Kebab
                       {% unless user_defined_help_short %}
                         __kebab_bail(::Kebab::Help.new(__kebab_help_text)) if %char == 'h'
                       {% end %}
-                      __kebab_bail(::Kebab::Error::UnknownOption.new("-#{%char}", __kebab_options_schema, __kebab_usage))
+                      __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: "-#{%char}", options: __kebab_options_schema, usage: __kebab_usage))
                     {% else %}
                       case %char
                       {% for ivar in short_ivars %}
                         {%
                           option = ivar.annotation(::Kebab::Option)
+                          long = option[:long] || ivar.name.stringify.gsub(/_/, "-")
                           short = option[:short]
+                          description = option[:description] || ""
                           converter = option[:converter]
                           base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
                         %}
                         when {{short}}
+                          %schema{ivar.name} = ::Kebab::Schema::Option.new(
+                            long: {{long}},
+                            short: {{short}},
+                            description: {{description}},
+                            takes_value: {{base != Bool}},
+                          )
                           unless %value{ivar.name}.nil?
-                            __kebab_bail(::Kebab::Error::RepeatedOption.new("-#{{{short}}}"))
+                            __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}, options: __kebab_options_schema, usage: __kebab_usage))
                           end
                           {% if base == Bool %}
                             if %last_char && (%inline = %token.value)
-                              __kebab_bail(::Kebab::Error::InvalidValueOf(Bool).new(
+                              __kebab_bail(::Kebab::Error::InvalidValue::Typed(Bool, {{@type}}).new(
                                 value: %inline,
-                                option: "-#{{{short}}}",
+                                source: %schema{ivar.name},
                                 target_name: "flag",
                                 reason: "flags don't accept inline values",
                               ))
                             end
                             %value{ivar.name} = true
                           {% else %}
-                            __kebab_bail(::Kebab::Error::MissingValue.new("-#{{{short}}}")) unless %last_char
+                            __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(%schema{ivar.name}, options: __kebab_options_schema, usage: __kebab_usage)) unless %last_char
 
-                            %raw_value = %token.value || __kebab_next_value(args, %index, %separated, "-#{{{short}}}").tap { %index += 1 }
+                            %raw_value = %token.value || __kebab_next_value(args, %index, %separated, %schema{ivar.name}).tap { %index += 1 }
                             {% if converter %}
-                              %value{ivar.name} = __kebab_convert({{base}}, "-#{{{short}}}", %raw_value, converter: {{converter}})
+                              %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %raw_value, converter: {{converter}})
                             {% else %}
-                              %value{ivar.name} = __kebab_convert({{base}}, "-#{{{short}}}", %raw_value)
+                              %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %raw_value)
                             {% end %}
                           {% end %}
                       {% end %}
@@ -211,7 +263,7 @@ module Kebab
                           __kebab_bail(::Kebab::Help.new(__kebab_help_text))
                       {% end %}
                       else
-                        __kebab_bail(::Kebab::Error::UnknownOption.new("-#{%char}", __kebab_options_schema, __kebab_usage))
+                        __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: "-#{%char}", options: __kebab_options_schema, usage: __kebab_usage))
                       end
                     {% end %}
                   end
@@ -238,7 +290,7 @@ module Kebab
                         break
                     {% end %}
                     else
-                      __kebab_bail(::Kebab::Error::UnknownCommand.new(%token.value, __kebab_commands_schema, __kebab_usage))
+                      __kebab_bail(::Kebab::Error::UnknownCommand::For({{@type}}).new(input: %token.value, commands: __kebab_commands_schema, usage: __kebab_usage))
                     end
                   {% else %}
                     %positionals << %token.value
@@ -252,10 +304,16 @@ module Kebab
                 {%
                   argument = ivar.annotation(::Kebab::Argument)
                   argument_name = (argument && argument[:name]) || ivar.name.stringify.gsub(/_/, "-")
+                  argument_description = (argument && argument[:description]) || ""
                   converter = argument && argument[:converter]
                   base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
                   is_variadic = base.name(generic_args: false).stringify == "Array"
                 %}
+                %arg_schema{ivar.name} = ::Kebab::Schema::Argument.new(
+                  name: {{argument_name}},
+                  description: {{argument_description}},
+                  variadic: {{is_variadic}},
+                )
                 {% if is_variadic %}
                   {% inner_type = base.type_vars.first %}
                   if %positionals.size > {{position}}
@@ -263,9 +321,9 @@ module Kebab
                     %i = {{position}}
                     while %i < %positionals.size
                       {% if converter %}
-                        %elements << __kebab_convert({{inner_type}}, {{argument_name}}, %positionals[%i], converter: {{converter}})
+                        %elements << __kebab_convert({{inner_type}}, %arg_schema{ivar.name}, %positionals[%i], converter: {{converter}})
                       {% else %}
-                        %elements << __kebab_convert({{inner_type}}, {{argument_name}}, %positionals[%i])
+                        %elements << __kebab_convert({{inner_type}}, %arg_schema{ivar.name}, %positionals[%i])
                       {% end %}
                       %i += 1
                     end
@@ -274,9 +332,9 @@ module Kebab
                 {% else %}
                   if %positional{ivar.name} = %positionals[{{position}}]?
                     {% if converter %}
-                      %value{ivar.name} = __kebab_convert({{base}}, {{argument_name}}, %positional{ivar.name}, converter: {{converter}})
+                      %value{ivar.name} = __kebab_convert({{base}}, %arg_schema{ivar.name}, %positional{ivar.name}, converter: {{converter}})
                     {% else %}
-                      %value{ivar.name} = __kebab_convert({{base}}, {{argument_name}}, %positional{ivar.name})
+                      %value{ivar.name} = __kebab_convert({{base}}, %arg_schema{ivar.name}, %positional{ivar.name})
                     {% end %}
                   end
                 {% end %}
@@ -284,7 +342,7 @@ module Kebab
 
               {% if !subcommand_ivar && !has_variadic_argument %}
                 if %extra = %positionals[{{argument_ivars.size}}]?
-                  __kebab_bail(::Kebab::Error::UnexpectedArgument.new(%extra, __kebab_arguments_schema, __kebab_usage))
+                  __kebab_bail(::Kebab::Error::UnexpectedArgument::For({{@type}}).new(%extra, __kebab_arguments_schema, __kebab_usage))
                 end
               {% end %}
 
@@ -294,7 +352,7 @@ module Kebab
                 %assigned{subcommand_ivar.name} = %value{subcommand_ivar.name}
                 if %assigned{subcommand_ivar.name}.nil?
                   {% if subcommand_required %}
-                    __kebab_bail(::Kebab::Error::MissingCommand.new(__kebab_commands_schema, __kebab_usage))
+                    __kebab_bail(::Kebab::Error::MissingCommand::For({{@type}}).new(__kebab_commands_schema, __kebab_usage))
                   {% else %}
                     __kebab_bail(::Kebab::Help.new(__kebab_help_text))
                   {% end %}
@@ -307,13 +365,6 @@ module Kebab
                   option = ivar.annotation(::Kebab::Option)
                   argument = ivar.annotation(::Kebab::Argument)
                   base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
-
-                  display_name =
-                    if argument
-                      (argument[:name] || ivar.name.stringify.gsub(/_/, "-"))
-                    else
-                      "--#{((option && option[:long]) || ivar.name.stringify.gsub(/_/, "-")).id}"
-                    end
                 %}
                 %assigned{ivar.name} = %value{ivar.name}
                 @{{ivar.name}} =
@@ -326,9 +377,36 @@ module Kebab
                       nil
                     {% else %}
                       {% if argument %}
-                        __kebab_bail(::Kebab::Error::MissingArgument.new({{display_name}}, __kebab_arguments_schema, __kebab_usage))
+                        {%
+                          argument_name = (argument && argument[:name]) || ivar.name.stringify.gsub(/_/, "-")
+                          argument_description = (argument && argument[:description]) || ""
+                          is_variadic = base.name(generic_args: false).stringify == "Array"
+                        %}
+                        __kebab_bail(::Kebab::Error::MissingArgument::For({{@type}}).new(
+                          argument: ::Kebab::Schema::Argument.new(
+                            name: {{argument_name}},
+                            description: {{argument_description}},
+                            variadic: {{is_variadic}},
+                          ),
+                          arguments: __kebab_arguments_schema,
+                          usage: __kebab_usage,
+                        ))
                       {% else %}
-                        __kebab_bail(::Kebab::Error::MissingOption.new({{display_name}}, __kebab_options_schema, __kebab_usage))
+                        {%
+                          long = (option && option[:long]) || ivar.name.stringify.gsub(/_/, "-")
+                          short = option && option[:short]
+                          description = (option && option[:description]) || ""
+                        %}
+                        __kebab_bail(::Kebab::Error::MissingOption::For({{@type}}).new(
+                          option: ::Kebab::Schema::Option.new(
+                            long: {{long}},
+                            short: {{short}},
+                            description: {{description}},
+                            takes_value: {{base != Bool}},
+                          ),
+                          options: __kebab_options_schema,
+                          usage: __kebab_usage,
+                        ))
                       {% end %}
                     {% end %}
                   else
@@ -371,7 +449,7 @@ module Kebab
             {% else %}
               ::Kebab::Schema::Usage::Arguments.new(
                 command_path: @__kebab_parent_path + [{{command_name}}],
-                has_options: true,
+                has_options: {{has_options}},
                 argument_names: {{argument_names}} of ::String,
                 has_variadic_tail: {{tail_variadic}},
               )
@@ -500,6 +578,40 @@ module Kebab
             end
           {% end %}
         end
+
+        private def __kebab_bail(result : ::Kebab::Help | ::Kebab::Errors) : NoReturn
+          raise ::Kebab::Internal::ParseExit.new(result)
+        end
+
+        private def __kebab_next_value(args : Array(String), index : Int32, separated : Bool, option : ::Kebab::Schema::Option) : String
+          next_raw = args[index + 1]?
+          if next_raw.nil? || (!separated && !::Kebab::Scanner.scan(next_raw).is_a?(::Kebab::Tokens::Positional))
+            {% begin %}
+              __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(option, options: __kebab_options_schema, usage: __kebab_usage))
+            {% end %}
+          end
+
+          next_raw
+        end
+
+        private def __kebab_convert(type : T.class, source : ::Kebab::Schema::Option | ::Kebab::Schema::Argument, raw : String) : T forall T
+          __kebab_unwrap(type, source, raw, ::Kebab::Convert.parse(type, raw))
+        end
+
+        private def __kebab_convert(type : T.class, source : ::Kebab::Schema::Option | ::Kebab::Schema::Argument, raw : String, converter) : T forall T
+          __kebab_unwrap(type, source, raw, converter.parse(raw))
+        end
+
+        private def __kebab_unwrap(type : T.class, source : ::Kebab::Schema::Option | ::Kebab::Schema::Argument, raw : String, result : T | ::Kebab::Convert::Failure) : T forall T
+          case result
+          in T
+            result
+          in ::Kebab::Convert::Failure
+            {% begin %}
+              __kebab_bail(::Kebab::Error::InvalidValue::Typed(T, {{@type}}).from(result, value: raw, source: source))
+            {% end %}
+          end
+        end
       {% end %}
     end
 
@@ -512,36 +624,6 @@ module Kebab
           raise "#{self.class}#run isn't defined. Add `def run(...) : Nil` so kebab can call it after parsing."
         {% end %}
       {% end %}
-    end
-
-    private def __kebab_bail(result : ::Kebab::Help | ::Kebab::Errors) : NoReturn
-      raise ::Kebab::Internal::ParseExit.new(result)
-    end
-
-    private def __kebab_next_value(args : Array(String), index : Int32, separated : Bool, name : String) : String
-      next_raw = args[index + 1]?
-      if next_raw.nil? || (!separated && !::Kebab::Scanner.scan(next_raw).is_a?(::Kebab::Tokens::Positional))
-        __kebab_bail(::Kebab::Error::MissingValue.new(name))
-      end
-
-      next_raw
-    end
-
-    private def __kebab_convert(type : T.class, name : String, raw : String) : T forall T
-      __kebab_unwrap(type, name, raw, ::Kebab::Convert.parse(type, raw))
-    end
-
-    private def __kebab_convert(type : T.class, name : String, raw : String, converter) : T forall T
-      __kebab_unwrap(type, name, raw, converter.parse(raw))
-    end
-
-    private def __kebab_unwrap(type : T.class, name : String, raw : String, result : T | ::Kebab::Convert::Failure) : T forall T
-      case result
-      in T
-        result
-      in ::Kebab::Convert::Failure
-        __kebab_bail(::Kebab::Error::InvalidValueOf(T).from(result, value: raw, option: name))
-      end
     end
   end
 end
