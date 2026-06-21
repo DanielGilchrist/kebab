@@ -49,7 +49,7 @@ Missing types:
  - List
 ```
 
-Handle some children with `when` and leave an `else`, and `else` sees the union of the rest. After `when Add`, the bound variable is `(List | Done)`. This is plain Crystal flow typing over the union, nothing kebab-specific.
+Handle some children with `when` and leave an `else`, and `else` sees whatever is left. After `when Add` here that leaves `List`. With more children it would be their union. This is plain Crystal flow typing over the union, nothing kebab-specific.
 
 ## Running children directly
 

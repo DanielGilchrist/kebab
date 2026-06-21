@@ -19,6 +19,6 @@ in Greet
 in Kebab::Help
   puts result
 in Kebab::Errors
-  STDERR.puts(result)
+  STDERR.puts result
   exit(1)
 end

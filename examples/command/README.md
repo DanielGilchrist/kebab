@@ -22,7 +22,7 @@ Greet.run(ARGV, context)             # run(context)
 Greet.run(ARGV, db: my_db)           # run(db: my_db)
 ```
 
-Every `run` in a command tree must accept the same signature. See [`../subcommands/`](../subcommands/) for an example.
+Every `run` in a command tree must accept the same signature. A subcommand parent forwards its args straight to the chosen child, so they all have to agree.
 
 ## Redirecting output
 
