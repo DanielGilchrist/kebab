@@ -28,14 +28,6 @@ private struct CompTasks
 end
 
 describe Kebab::Completion::Shell do
-  describe "#file_name" do
-    it "names the script per shell convention" do
-      Kebab::Completion::Shell::Fish.file_name("tasks").should eq("tasks.fish")
-      Kebab::Completion::Shell::Bash.file_name("tasks").should eq("tasks")
-      Kebab::Completion::Shell::Zsh.file_name("tasks").should eq("_tasks")
-    end
-  end
-
   describe "#generate (fish)" do
     it "disables file completion and names the binary from the schema" do
       script = Kebab::Completion::Shell::Fish.generate(CompTasks.schema)

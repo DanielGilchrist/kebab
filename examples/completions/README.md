@@ -42,28 +42,12 @@ eval "$(todo completions bash)"
 source <(todo completions zsh)
 ```
 
-## Adding a shell kebab doesn't ship
+## Other shells
 
-A generator is any type with `generate(command : Kebab::Schema::Command, binary : String? = nil) : String`. Write one, then dispatch to it from your own shell enum alongside the built-ins:
+`Kebab::Completion::Shell` is a convenience for the shells kebab ships. You are not tied to it. `Todo.schema` is the public input a completion script is built from, so a shell kebab doesn't cover is just a script you build from that:
 
 ```crystal
-module Nushell
-  def self.generate(command : Kebab::Schema::Command, binary : String? = nil) : String
-    # walk command.subcommands and command.options
-  end
-end
-
-enum AppShell
-  Fish
-  Nu
-
-  def generate(command : Kebab::Schema::Command, binary : String? = nil) : String
-    case self
-    in Fish then Kebab::Completion::Shell::Fish.generate(command, binary)
-    in Nu   then Nushell.generate(command, binary)
-    end
-  end
-end
+script = generate_xonsh(Todo.schema)  # walk command.subcommands and command.options
 ```
 
-Then use `AppShell` as the argument type instead of `Kebab::Completion::Shell`.
+Wire it up however suits you. If you want kebab's built-ins in the same command, `Kebab::Completion::Shell::Fish.generate(Todo.schema)` (and `Bash`/`Zsh`) are there to reuse.

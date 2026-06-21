@@ -116,8 +116,9 @@ eval "$(todo completions bash)"         # bash, in ~/.bashrc
 source <(todo completions zsh)          # zsh, in ~/.zshrc after compinit
 ```
 
-To support another shell, write a generator (any type with
-`generate(command, binary)`) and dispatch to it from your own shell enum. See
+The enum is a convenience, not a requirement. A completion script is built from
+`Type.schema`, so a shell kebab doesn't ship is just a script you generate from
+it yourself, dispatched however you like. See
 [`examples/completions/`](examples/completions/).
 
 ## Command structure
