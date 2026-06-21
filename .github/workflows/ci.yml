@@ -9,6 +9,13 @@ on:
     - cron: "0 3 * * 1"
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   format:
     runs-on: ubuntu-latest
@@ -26,6 +33,15 @@ jobs:
       - uses: crystal-lang/install-crystal@v1
         with:
           crystal: latest
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/shards
+            lib
+            bin
+          key: shards-${{ runner.os }}-${{ hashFiles('shard.yml') }}
+          restore-keys: |
+            shards-${{ runner.os }}-
       - run: shards install
       - run: ./bin/ameba
 

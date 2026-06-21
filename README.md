@@ -1,7 +1,5 @@
 # Kebab
 
-A type-safe CLI parser for Crystal.
-
 WIP. Public API is subject to change.
 
 ## Installation
