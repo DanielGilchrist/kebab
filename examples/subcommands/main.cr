@@ -32,7 +32,11 @@ in Tasks
   in Add
     puts "Added: #{sub.description}"
   in List
-    puts sub.all? ? "Showing all tasks" : "Showing pending tasks"
+    if sub.all?
+      puts "Showing all tasks"
+    else
+      puts "Showing pending tasks"
+    end
   end
 in Kebab::Help
   puts result

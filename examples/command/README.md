@@ -15,11 +15,11 @@ crystal run main.cr -- Daniel --doesnt-exist
 
 `Greet.run(ARGV)` returns `Bool`. `true` for success or help, `false` for parse errors.
 
-`Type.run` forwards any extra positional or keyword args to `run`:
+`Type.run` forwards any extra positional or keyword args through to `run`. If `Greet#run` took a `context`:
 
 ```crystal
-Greet.run(ARGV, context)             # run(context)
-Greet.run(ARGV, db: my_db)           # run(db: my_db)
+Greet.run(ARGV, context)    # calls run(context)
+Greet.run(ARGV, db: my_db)  # calls run(db: my_db)
 ```
 
 Every `run` in a command tree must accept the same signature. A subcommand parent forwards its args straight to the chosen child, so they all have to agree.

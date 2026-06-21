@@ -38,7 +38,8 @@ end
 case result = Greet.parse(ARGV)
 in Greet
   message = "Hello, #{result.name}!"
-  puts result.loud? ? message.upcase : message
+  message = message.upcase if result.loud?
+  puts message
 in Kebab::Help
   puts result        # the user passed --help
 in Kebab::Errors
@@ -70,7 +71,8 @@ struct Greet
 
   def run : Nil
     message = "Hello, #{name}!"
-    puts loud? ? message.upcase : message
+    message = message.upcase if loud?
+    puts message
   end
 end
 

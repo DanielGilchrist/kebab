@@ -6,8 +6,11 @@ require "../../src/kebab"
 # empty string when nothing is close enough.
 module Suggest
   def self.hint(input : String, candidates : Enumerable(String)) : String
-    guess = Levenshtein.find(input, candidates)
-    guess ? " (did you mean '#{guess}'?)" : ""
+    if guess = Levenshtein.find(input, candidates)
+      " (did you mean '#{guess}'?)"
+    else
+      ""
+    end
   end
 end
 
