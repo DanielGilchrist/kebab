@@ -44,10 +44,33 @@ source <(todo completions zsh)
 
 ## Other shells
 
-`Kebab::Completion::Shell` is a convenience for the shells kebab ships. You are not tied to it. `Todo.schema` is the public input a completion script is built from, so a shell kebab doesn't cover is just a script you build from that:
+`Kebab::Completion::Shell` is a convenience for the shells kebab ships, not a requirement. A completion script is built from `Todo.schema`, so a shell kebab doesn't cover is just a script you generate from it, wired up however suits you.
+
+If you want the same typed-argument pattern for an extra shell, define your own enum and dispatch to the built-ins plus your own generator:
 
 ```crystal
-script = generate_xonsh(Todo.schema)  # walk command.subcommands and command.options
+module Nushell
+  def self.generate(command : Kebab::Schema::Command, binary : String? = nil) : String
+    # walk command.subcommands and command.options
+  end
+end
+
+enum AppShell
+  Fish
+  Nu
+
+  def generate(command : Kebab::Schema::Command, binary : String? = nil) : String
+    case self
+    in Fish then Kebab::Completion::Shell::Fish.generate(command, binary)  # reuse a built-in
+    in Nu   then Nushell.generate(command, binary)                          # your own
+    end
+  end
+end
 ```
 
-Wire it up however suits you. If you want kebab's built-ins in the same command, `Kebab::Completion::Shell::Fish.generate(Todo.schema)` (and `Bash`/`Zsh`) are there to reuse.
+Then parse it with the same converter, using your enum in place of `Kebab::Completion::Shell`:
+
+```crystal
+@[Kebab::Argument(converter: Kebab::Convert::Enum(AppShell))]
+getter shell : AppShell
+```
