@@ -6,11 +6,11 @@ require "./help"
 require "./parse_exit"
 require "./parseable/schema_check"
 require "./renderer"
-require "./scanner"
 require "./schema/argument"
 require "./schema/command"
 require "./schema/option"
 require "./schema/usage"
+require "./token"
 
 module Kebab
   # Included on a `struct` to make it parseable from `Array(String)` args.
@@ -147,7 +147,7 @@ module Kebab
 
               while %index < args.size
                 %raw = args[%index]
-                %token = %separated ? ::Kebab::Token::Positional.new(%raw) : ::Kebab::Scanner.scan(%raw)
+                %token = %separated ? ::Kebab::Token::Positional.new(%raw) : ::Kebab::Token.classify(%raw)
 
                 case %token
                 in ::Kebab::Token::Separator
@@ -585,7 +585,7 @@ module Kebab
 
         private def __kebab_next_value(args : Array(String), index : Int32, separated : Bool, option : ::Kebab::Schema::Option) : String
           next_raw = args[index + 1]?
-          if next_raw.nil? || (!separated && !::Kebab::Scanner.scan(next_raw).is_a?(::Kebab::Token::Positional))
+          if next_raw.nil? || (!separated && !::Kebab::Token.classify(next_raw).is_a?(::Kebab::Token::Positional))
             {% begin %}
               __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(option, options: __kebab_options_schema, usage: __kebab_usage))
             {% end %}
