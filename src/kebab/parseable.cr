@@ -1,5 +1,6 @@
 require "colorize"
 
+require "./completion"
 require "./convert"
 require "./errors"
 require "./help"
@@ -54,6 +55,20 @@ module Kebab
         false
       end
 
+      # Returns the command and its whole subtree as an immutable
+      # `Kebab::Schema::Command`, derived at compile time. Pure and total,
+      # never raises. `parent_path` prefixes the command path (used when a
+      # parent forwards its path down to a child).
+      def self.schema(parent_path : Array(String) = [] of String) : ::Kebab::Schema::Command
+        __kebab_schema(parent_path)
+      end
+
+      # Returns a fish completion script for this command tree, registered
+      # against the binary name `command`. Pure, never raises.
+      def self.completion_fish(command : String) : String
+        ::Kebab::Completion.fish(schema, command)
+      end
+
       {% verbatim do %}
         def self.__kebab_route_error(error : ::Kebab::Errors, stderr : ::IO) : Bool
           target = error.command
@@ -72,6 +87,90 @@ module Kebab
           {% end %}
 
           false
+        end
+
+        def self.__kebab_schema(parent_path : Array(String)) : ::Kebab::Schema::Command
+          {% begin %}
+            {%
+              command = @type.annotation(::Kebab::Command)
+              command_name = (command && command[:name]) || @type.name.stringify.split("::").last.underscore
+              summary = (command && command[:summary]) || ""
+
+              option_rows = [] of Nil
+              argument_rows = [] of Nil
+              subcommand_members = [] of Nil
+              requires_subcommand = false
+              user_help_long = false
+              user_help_short = false
+              has_declared_options = false
+
+              @type.instance_vars.each do |ivar|
+                if subcommand = ivar.annotation(::Kebab::Subcommand)
+                  requires_subcommand = !!(subcommand[:required])
+                  members = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil } : [ivar.type]
+                  members.each { |member| subcommand_members << member }
+                elsif argument = ivar.annotation(::Kebab::Argument)
+                  argument_name = argument[:name] || ivar.name.stringify.gsub(/_/, "-")
+                  base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
+                  is_variadic = base.name(generic_args: false).stringify == "Array"
+                  argument_rows << {argument_name, argument[:description] || "", is_variadic}
+                elsif option = ivar.annotation(::Kebab::Option)
+                  has_declared_options = true
+                  long = option[:long] || ivar.name.stringify.gsub(/_/, "-")
+                  short = option[:short]
+                  user_help_long = true if long == "help"
+                  user_help_short = true if short == 'h'
+                  base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
+                  option_rows << {long, short, option[:description] || "", base != Bool}
+                end
+              end
+
+              unless user_help_long || user_help_short
+                option_rows << {"help", 'h', "Show this help", false}
+              end
+
+              member_pairs = [] of Nil
+              user_help_subcommand = false
+              subcommand_members.each do |member|
+                member_command = member.annotation(::Kebab::Command)
+                member_name = (member_command && member_command[:name]) || member.name.stringify.split("::").last.underscore
+                user_help_subcommand = true if member_name == "help"
+                member_pairs << {member_name, member}
+              end
+              member_pairs = member_pairs.sort_by { |member_pair| member_pair[0] }
+            %}
+
+            %path = parent_path + [{{command_name}}]
+            ::Kebab::Schema::Command.new(
+              path: %path,
+              summary: {{summary}},
+              options: [
+                {% for option_row in option_rows %}
+                  ::Kebab::Schema::Option.new(
+                    long: {{option_row[0]}},
+                    short: {{option_row[1]}},
+                    description: {{option_row[2]}},
+                    takes_value: {{option_row[3]}},
+                  ),
+                {% end %}
+              ] of ::Kebab::Schema::Option,
+              arguments: [
+                {% for argument_row in argument_rows %}
+                  ::Kebab::Schema::Argument.new({{argument_row[0]}}, {{argument_row[1]}}, {{argument_row[2]}}),
+                {% end %}
+              ] of ::Kebab::Schema::Argument,
+              subcommands: [
+                {% for member_pair in member_pairs %}
+                  {{member_pair[1]}}.__kebab_schema(%path),
+                {% end %}
+                {% if !member_pairs.empty? && !user_help_subcommand %}
+                  ::Kebab::Schema::Command.new(path: %path + ["help"], summary: "Show this help"),
+                {% end %}
+              ] of ::Kebab::Schema::Command,
+              has_options: {{has_declared_options}},
+              requires_subcommand: {{requires_subcommand}},
+            )
+          {% end %}
         end
 
         def initialize(*, __kebab_args args : Array(String), __kebab_parent_path parent_path : Array(String) = [] of String)
