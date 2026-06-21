@@ -27,26 +27,26 @@ struct List
   end
 end
 
+# A normal subcommand. The shell is a typed enum, parsed by kebab, so an
+# unknown shell is a parse error listing the valid ones (no hand-rolled check).
+@[Kebab::Command(name: "completions", summary: "Print a shell completion script")]
+struct Completions
+  include Kebab::Parseable
+
+  @[Kebab::Argument(description: "Shell", converter: Kebab::Convert::Enum(Kebab::Completion::Shell))]
+  getter shell : Kebab::Completion::Shell
+
+  def run : Nil
+    puts shell.generate(Todo.schema)
+  end
+end
+
 @[Kebab::Command(name: "todo", summary: "A tiny todo app")]
 struct Todo
   include Kebab::Parseable
 
   @[Kebab::Subcommand]
-  getter command : Add | List
-end
-
-# Completion generation is a meta-operation, so handle it before normal
-# parsing. Kebab gives you the script as a string and you decide how to expose
-# it (a hidden subcommand, a flag, a separate binary, whatever fits).
-if ARGV.first? == "completions"
-  case ARGV[1]?
-  when "fish"
-    puts Todo.completion_fish("todo")
-  else
-    STDERR.puts "usage: todo completions fish"
-    exit(1)
-  end
-  exit
+  getter command : Add | List | Completions
 end
 
 exit(1) unless Todo.run(ARGV)

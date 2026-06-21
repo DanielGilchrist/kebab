@@ -1,37 +1,69 @@
 # Shell completion
 
-`Type.completion_fish("binary-name")` returns a fish completion script built from the command tree. This example exposes it through a `completions` subcommand.
+`Kebab::Completion::Shell` generates completion scripts for fish, bash, and zsh. This example exposes them through a `completions <shell>` subcommand.
 
 ## Run it
 
 ```sh
 crystal run main.cr -- completions fish
+crystal run main.cr -- completions bash
+crystal run main.cr -- completions zsh
 
-# the normal CLI still works
+# unknown shell is a parse error listing the valid ones
+crystal run main.cr -- completions ksh
+
+# the normal CLI works as usual
 crystal run main.cr -- add "buy milk" -p 2
 crystal run main.cr -- list --all
 ```
 
 ## How it works
 
-Completion is generated from the same `Type.schema` tree that drives help, so subcommands, options, descriptions, and value-vs-flag status all come through automatically.
+The shell is a typed argument: `getter shell : Kebab::Completion::Shell`, parsed with `Kebab::Convert::Enum`. An unknown shell fails at parse time with `one of: fish, bash, zsh`, so there is no string matching or error handling to write. `run` is one line:
 
-`main.cr` handles `completions fish` before normal parsing and prints the script. Kebab hands you the string and you decide how to expose it. A hidden subcommand (shown here), a flag, or a separate binary all work.
+```crystal
+puts shell.generate(Todo.schema)
+```
 
-The output is standard fish `complete` directives:
-
-- subcommands are offered before one is chosen (`__fish_use_subcommand`)
-- each subcommand's options are scoped to it (`__fish_seen_subcommand_from`)
-- value options are marked `-r`, boolean flags are not
+`Todo.schema` is the same command structure that drives help, so subcommands, options, and descriptions all come through.
 
 ## Installing it
 
-Save the script where fish looks for completions:
+Source it at shell startup so it tracks the current binary (re-run on each launch, never stale):
 
 ```sh
-todo completions fish > ~/.config/fish/completions/todo.fish
+# fish
+todo completions fish | source
+
+# bash (~/.bashrc)
+eval "$(todo completions bash)"
+
+# zsh (~/.zshrc, after compinit)
+source <(todo completions zsh)
 ```
 
-## Other shells
+## Adding a shell kebab doesn't ship
 
-Only fish is generated for now. The generators are pure functions over the `Kebab::Schema::Command` tree (see `Kebab::Completion`), so a new shell is a new function over the same IR, and you can write your own against `Type.schema`.
+Implement `Kebab::Completion::Generator`, then dispatch to it from your own shell enum alongside the built-ins:
+
+```crystal
+struct Nushell::Completion
+  include Kebab::Completion::Generator
+  def generate(command : Kebab::Schema::Command, binary : String? = nil) : String ; end
+  def file_name(binary : String) : String ; "#{binary}.nu" ; end
+end
+
+enum AppShell
+  Fish
+  Nu
+
+  def generate(command : Kebab::Schema::Command, binary : String? = nil) : String
+    case self
+    in Fish then Kebab::Completion::Shell::Fish.generate(command, binary)
+    in Nu   then Nushell::Completion.new.generate(command, binary)
+    end
+  end
+end
+```
+
+Then use `AppShell` as the argument type instead of `Kebab::Completion::Shell`.

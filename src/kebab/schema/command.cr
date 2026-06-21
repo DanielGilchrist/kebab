@@ -4,13 +4,12 @@ require "./usage"
 
 module Kebab
   module Schema
-    # The full structure of one command in the tree, derived from the command
-    # struct at compile time. Recursive: `subcommands` holds the same node for
-    # each child, so the whole CLI is one immutable value.
+    # The structure of one command, built from the command struct at compile
+    # time. `subcommands` holds the same type for each child.
     #
-    # `options` includes the synthetic `--help` entry, so it is what help and
-    # completion list. `has_options?` reflects only options the command
-    # declares, so it is what drives `[options]` in the usage line.
+    # `options` includes the synthetic `--help`, so it is what help and
+    # completion list. `has_options?` counts only declared options, so it is
+    # what drives `[options]` in the usage line.
     struct Command
       def initialize(
         @path : Array(String),

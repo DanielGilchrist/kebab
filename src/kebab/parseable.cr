@@ -63,12 +63,6 @@ module Kebab
         __kebab_schema(parent_path)
       end
 
-      # Returns a fish completion script for this command tree, registered
-      # against the binary name `command`. Pure, never raises.
-      def self.completion_fish(command : String) : String
-        ::Kebab::Completion.fish(schema, command)
-      end
-
       {% verbatim do %}
         def self.__kebab_route_error(error : ::Kebab::Errors, stderr : ::IO) : Bool
           target = error.command

@@ -86,31 +86,45 @@ Runnable walkthroughs in [`examples/`](examples/):
 - [`examples/subcommands/`](examples/subcommands/) — multi-level command tree.
 - [`examples/errors/`](examples/errors/) — typed error dispatch in parsing mode.
 - [`examples/suggestions/`](examples/suggestions/) — in-command error handlers with "did you mean" hints.
-- [`examples/completions/`](examples/completions/) — generating a fish completion script.
+- [`examples/completions/`](examples/completions/) — generating fish, bash, and zsh completions.
 
 ## Shell completion
 
-`Type.completion_fish("binary-name")` returns a fish completion script derived
-from the command tree, covering subcommands, options, and their descriptions:
+`Kebab::Completion::Shell` generates completion scripts for fish, bash, and
+zsh. Expose it as a subcommand with a typed shell argument:
 
 ```crystal
-puts Todo.completion_fish("todo")
+@[Kebab::Command(name: "completions", summary: "Print a shell completion script")]
+struct Completions
+  include Kebab::Parseable
+
+  @[Kebab::Argument(converter: Kebab::Convert::Enum(Kebab::Completion::Shell))]
+  getter shell : Kebab::Completion::Shell
+
+  def run : Nil
+    puts shell.generate(Todo.schema)
+  end
+end
 ```
 
-How you expose it is up to you (a hidden subcommand, a flag, a separate
-binary). Save the output where fish looks for completions:
+An unknown shell is a parse error listing the valid ones. Source the script at
+shell startup so it tracks the current binary:
 
 ```sh
-todo completions fish > ~/.config/fish/completions/todo.fish
+todo completions fish | source          # fish
+eval "$(todo completions bash)"         # bash, in ~/.bashrc
+source <(todo completions zsh)          # zsh, in ~/.zshrc after compinit
 ```
 
-## Inspecting the command tree
+To support another shell, implement `Kebab::Completion::Generator` and dispatch
+to it from your own shell enum. See [`examples/completions/`](examples/completions/).
 
-Both completion and help are generated from one representation,
-`Type.schema`, which returns the whole tree as an immutable
-`Kebab::Schema::Command` (options, arguments, subcommands, usage). It is the
-same value carried on every parse error as `error.schema`, and you can walk it
-yourself to drive your own tooling.
+## Command structure
+
+`Type.schema` returns the command and its subcommands as a
+`Kebab::Schema::Command` (options, arguments, subcommands, usage). It drives
+help and completion, is carried on every parse error as `error.schema`, and you
+can walk it for your own tooling.
 
 ## Colour
 
