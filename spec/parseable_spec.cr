@@ -319,6 +319,18 @@ describe Kebab::Parseable do
     error.should be_a(Kebab::Error::InvalidValue::Exact(Int32, Punch))
   end
 
+  it "carries the command schema on InvalidValue" do
+    error = parse_punch_error!(["--weeks", "potato"]).as(Kebab::Error::InvalidValue)
+    error.schema.path.should eq(["punch"])
+    error.schema.options.map(&.long).should contain("weeks")
+  end
+
+  it "carries the command schema on UnknownOption" do
+    error = parse_punch_error!(["--nope"]).as(Kebab::Error::UnknownOption)
+    error.schema.path.should eq(["punch"])
+    error.schema.options.map(&.long).should contain("at")
+  end
+
   it "narrows InvalidValue by target type via case" do
     error = parse_punch_error!(["--weeks", "potato"])
     case error

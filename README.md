@@ -86,6 +86,31 @@ Runnable walkthroughs in [`examples/`](examples/):
 - [`examples/subcommands/`](examples/subcommands/) — multi-level command tree.
 - [`examples/errors/`](examples/errors/) — typed error dispatch in parsing mode.
 - [`examples/suggestions/`](examples/suggestions/) — in-command error handlers with "did you mean" hints.
+- [`examples/completions/`](examples/completions/) — generating a fish completion script.
+
+## Shell completion
+
+`Type.completion_fish("binary-name")` returns a fish completion script derived
+from the command tree, covering subcommands, options, and their descriptions:
+
+```crystal
+puts Todo.completion_fish("todo")
+```
+
+How you expose it is up to you (a hidden subcommand, a flag, a separate
+binary). Save the output where fish looks for completions:
+
+```sh
+todo completions fish > ~/.config/fish/completions/todo.fish
+```
+
+## Inspecting the command tree
+
+Both completion and help are generated from one representation,
+`Type.schema`, which returns the whole tree as an immutable
+`Kebab::Schema::Command` (options, arguments, subcommands, usage). It is the
+same value carried on every parse error as `error.schema`, and you can walk it
+yourself to drive your own tooling.
 
 ## Colour
 
