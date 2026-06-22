@@ -20,10 +20,10 @@ module Kebab
     macro included
       @__kebab_parent_path : Array(String) = [] of String
 
-      # Parses `args` into either an instance of `self`, a `Kebab::Help`
-      # (if the user asked for help), or one of the `Kebab::Errors`
-      # variants. Never raises.
-      def self.parse(args : Array(String)) : self | ::Kebab::Help | ::Kebab::Errors
+      # Parses `args` (defaulting to `ARGV`) into either an instance of `self`,
+      # a `Kebab::Help` (if the user asked for help), or one of the
+      # `Kebab::Errors` variants. Never raises.
+      def self.parse(args : Array(String) = ARGV) : self | ::Kebab::Help | ::Kebab::Errors
         __kebab_parse(args, [] of String)
       end
 
