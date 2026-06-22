@@ -5,8 +5,8 @@ Use kebab as a pure argument parser. The struct holds the parsed data and nothin
 ## Run it
 
 ```sh
-crystal run main.cr -- Daniel
-crystal run main.cr -- Daniel -l
+crystal run main.cr -- kebab
+crystal run main.cr -- kebab -l
 crystal run main.cr -- --help
 crystal run main.cr -- --bogus
 ```

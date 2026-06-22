@@ -5,10 +5,10 @@ The struct carries its behaviour in `def run`. `Type.run(ARGV)` parses, calls `r
 ## Run it
 
 ```sh
-crystal run main.cr -- Daniel
-crystal run main.cr -- Daniel -l -n 3
+crystal run main.cr -- kebab
+crystal run main.cr -- kebab -l -n 3
 crystal run main.cr -- --help
-crystal run main.cr -- Daniel --doesnt-exist
+crystal run main.cr -- kebab --doesnt-exist
 ```
 
 ## How it works

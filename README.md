@@ -87,6 +87,7 @@ Runnable walkthroughs in [`examples/`](examples/):
 - [`examples/errors/`](examples/errors/) — typed error dispatch in parsing mode.
 - [`examples/suggestions/`](examples/suggestions/) — in-command error handlers with "did you mean" hints.
 - [`examples/completions/`](examples/completions/) — generating fish, bash, and zsh completions.
+- [`examples/testing/`](examples/testing/) — testing commands with parse, injected dependencies, and captured IO.
 
 ## Shell completion
 
