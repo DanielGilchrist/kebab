@@ -35,7 +35,7 @@ struct Todo
   getter command : Add | List | Completions
 end
 
-case result = Todo.parse(ARGV)
+case result = Todo.parse
 in Todo
   case sub = result.command
   in Add

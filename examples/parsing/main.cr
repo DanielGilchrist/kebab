@@ -11,7 +11,7 @@ struct Greet
   getter? loud : Bool = false
 end
 
-case result = Greet.parse(ARGV)
+case result = Greet.parse
 in Greet
   message = "Hello, #{result.name}!"
   message = message.upcase if result.loud?

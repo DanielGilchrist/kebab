@@ -24,7 +24,7 @@ The shell is a typed argument: `getter shell : Kebab::Completion::Shell`, parsed
 `Todo.parse` returns the parsed command, and the `completions` subcommand is handled like any other:
 
 ```crystal
-case result = Todo.parse(ARGV)
+case result = Todo.parse
 in Todo
   case sub = result.command
   in Add         then # ...

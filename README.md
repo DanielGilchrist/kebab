@@ -32,8 +32,8 @@ struct Greet
   getter? loud : Bool = false
 end
 
-# Greet.parse(ARGV) : Greet | Kebab::Help | Kebab::Errors
-case result = Greet.parse(ARGV)
+# Greet.parse : Greet | Kebab::Help | Kebab::Errors  (args default to ARGV)
+case result = Greet.parse
 in Greet
   message = "Hello, #{result.name}!"
   message = message.upcase if result.loud?

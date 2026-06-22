@@ -24,7 +24,7 @@ struct Tasks
   getter command : Add | List
 end
 
-case result = Tasks.parse(ARGV)
+case result = Tasks.parse
 in Tasks
   case sub = result.command
   in Add

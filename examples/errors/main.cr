@@ -20,7 +20,7 @@ struct Query
   getter limit : Int32 = 10
 end
 
-case result = Query.parse(ARGV)
+case result = Query.parse
 in Query
   puts "Running '#{result.text}' (format=#{result.format}, limit=#{result.limit})"
 in Kebab::Help

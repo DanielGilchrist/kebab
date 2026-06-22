@@ -24,10 +24,10 @@ getter command : Add | List
 
 The CLI name for each child is the underscored struct name (`add`, `list`) unless overridden with `@[Kebab::Command(name: "...")]`.
 
-`Tasks.parse(ARGV)` returns `Tasks | Kebab::Help | Kebab::Errors`. On success you get the parent, never a child. The chosen child is data on the instance, in `result.command`, typed `Add | List`. So you match in two levels: first the parse result, then the subcommand.
+`Tasks.parse` returns `Tasks | Kebab::Help | Kebab::Errors`. On success you get the parent, never a child. The chosen child is data on the instance, in `result.command`, typed `Add | List`. So you match in two levels: first the parse result, then the subcommand.
 
 ```crystal
-case result = Tasks.parse(ARGV)
+case result = Tasks.parse
 in Tasks
   case sub = result.command
   in Add  then # ...
