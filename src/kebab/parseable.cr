@@ -23,7 +23,12 @@ module Kebab
       # Parses `args` into either an instance of `self`, a `Kebab::Help`
       # (if the user asked for help), or one of the `Kebab::Errors`
       # variants. Never raises.
-      def self.parse(args : Array(String), parent_path : Array(String) = [] of String) : self | ::Kebab::Help | ::Kebab::Errors
+      def self.parse(args : Array(String)) : self | ::Kebab::Help | ::Kebab::Errors
+        __kebab_parse(args, [] of String)
+      end
+
+      # :nodoc:
+      def self.__kebab_parse(args : Array(String), parent_path : Array(String)) : self | ::Kebab::Help | ::Kebab::Errors
         new(__kebab_args: args, __kebab_parent_path: parent_path)
       rescue ex : ::Kebab::ParseExit
         ex.result
@@ -57,10 +62,9 @@ module Kebab
 
       # Returns the command and its whole subtree as an immutable
       # `Kebab::Schema::Command`, derived at compile time. Pure and total,
-      # never raises. `parent_path` prefixes the command path (used when a
-      # parent forwards its path down to a child).
-      def self.schema(parent_path : Array(String) = [] of String) : ::Kebab::Schema::Command
-        __kebab_schema(parent_path)
+      # never raises.
+      def self.schema : ::Kebab::Schema::Command
+        __kebab_schema([] of String)
       end
 
       {% verbatim do %}
@@ -371,7 +375,7 @@ module Kebab
                     {% end %}
                     {% for member, member_index in subcommand_members %}
                       when {{subcommand_names[member_index]}}
-                        case %subcommand = {{member}}.parse(args[(%index + 1)..], parent_path: @__kebab_parent_path + [{{own_command_name}}])
+                        case %subcommand = {{member}}.__kebab_parse(args[(%index + 1)..], @__kebab_parent_path + [{{own_command_name}}])
                         when {{member}}
                           %value{subcommand_ivar.name} = %subcommand
                         when ::Kebab::Help
@@ -510,7 +514,7 @@ module Kebab
         end
 
         private def __kebab_help_text : String
-          node = self.class.schema(@__kebab_parent_path)
+          node = self.class.__kebab_schema(@__kebab_parent_path)
 
           ::String.build do |io|
             unless node.summary.empty?
@@ -541,7 +545,7 @@ module Kebab
         end
 
         private def __kebab_schema_node : ::Kebab::Schema::Command
-          self.class.schema(@__kebab_parent_path)
+          self.class.__kebab_schema(@__kebab_parent_path)
         end
 
         private def __kebab_next_value(args : Array(String), index : Int32, separated : Bool, option : ::Kebab::Schema::Option) : String

@@ -58,10 +58,6 @@ describe "Kebab::Parseable.schema" do
     SchemaTasks.schema.has_options?.should be_false
   end
 
-  it "honours parent_path so a child node knows its full path" do
-    SchemaAdd.schema(["tasks"]).path.should eq(["tasks", "add"])
-  end
-
   it "derives the usage line from the node shape" do
     SchemaTasks.schema.usage.to_s.should eq("tasks <command>")
     SchemaTasks.schema.subcommands.find!(&.name.== "add").usage.to_s.should eq("tasks add [options] <description>")
