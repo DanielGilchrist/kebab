@@ -348,11 +348,23 @@ enum SpecOutputFormat
   Text
 end
 
+enum SpecMultiWord
+  RawText
+  PrettyJson
+end
+
 private struct EnumHaver
   include Kebab::Parseable
 
   @[Kebab::Option(converter: Kebab::Convert::Enum(SpecOutputFormat))]
   getter format : SpecOutputFormat = SpecOutputFormat::Text
+end
+
+private struct MultiWordEnumHaver
+  include Kebab::Parseable
+
+  @[Kebab::Option(converter: Kebab::Convert::Enum(SpecMultiWord))]
+  getter format : SpecMultiWord = SpecMultiWord::PrettyJson
 end
 
 private struct VariadicRequired
@@ -511,7 +523,7 @@ describe Kebab::Convert::Enum do
 
   it "errors with the valid names when unrecognised" do
     error = EnumHaver.parse(["--format", "xml"]).as(Kebab::Error::InvalidValue)
-    error.reason.should eq("one of: json, yaml, text")
+    error.reason.should eq("one of: json, text or yaml")
     error.value.should eq("xml")
     error.target_type_name.should eq("SpecOutputFormat")
     error.target_name.should eq("spec output format")
@@ -520,6 +532,15 @@ describe Kebab::Convert::Enum do
     in Kebab::Schema::Argument then fail "expected option source"
     end
     error.should be_a(Kebab::Error::InvalidValue::Of(SpecOutputFormat))
+  end
+
+  it "parses multi-word members by their underscored name" do
+    MultiWordEnumHaver.parse(["--format", "pretty_json"]).as(MultiWordEnumHaver).format.should eq(SpecMultiWord::PrettyJson)
+  end
+
+  it "lists multi-word members underscored and sorted when unrecognised" do
+    error = MultiWordEnumHaver.parse(["--format", "xml"]).as(Kebab::Error::InvalidValue)
+    error.reason.should eq("one of: pretty_json or raw_text")
   end
 end
 
