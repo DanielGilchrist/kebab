@@ -19,6 +19,7 @@ module Kebab
   module Parseable
     macro included
       @__kebab_parent_path : Array(String) = [] of String
+      @__kebab_inherited_globals : Array(::Kebab::Schema::Option) = [] of ::Kebab::Schema::Option
 
       # Parses `args` (defaulting to `ARGV`) into either an instance of `self`,
       # a `Kebab::Help` (if the user asked for help), or one of the
@@ -28,8 +29,8 @@ module Kebab
       end
 
       # :nodoc:
-      def self.__kebab_parse(args : Array(String), parent_path : Array(String)) : self | ::Kebab::Help | ::Kebab::Errors
-        new(__kebab_args: args, __kebab_parent_path: parent_path)
+      def self.__kebab_parse(args : Array(String), parent_path : Array(String), inherited_globals : Array(::Kebab::Schema::Option) = [] of ::Kebab::Schema::Option) : self | ::Kebab::Help | ::Kebab::Errors
+        new(__kebab_args: args, __kebab_parent_path: parent_path, __kebab_inherited_globals: inherited_globals)
       rescue ex : ::Kebab::ParseExit
         ex.result
       end
@@ -87,7 +88,7 @@ module Kebab
           false
         end
 
-        def self.__kebab_schema(parent_path : Array(String)) : ::Kebab::Schema::Command
+        def self.__kebab_schema(parent_path : Array(String), inherited_globals : Array(::Kebab::Schema::Option) = [] of ::Kebab::Schema::Option) : ::Kebab::Schema::Command
           {% begin %}
             {%
               command = @type.annotation(::Kebab::Command)
@@ -95,6 +96,7 @@ module Kebab
               summary = (command && command[:summary]) || ""
 
               option_rows = [] of Nil
+              global_rows = [] of Nil
               argument_rows = [] of Nil
               subcommand_members = [] of Nil
               requires_subcommand = false
@@ -119,12 +121,10 @@ module Kebab
                   user_help_long = true if long == "help"
                   user_help_short = true if short == 'h'
                   base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
-                  option_rows << {long, short, option[:description] || "", base != Bool}
+                  row = {long, short, option[:description] || "", base != Bool}
+                  option_rows << row
+                  global_rows << row if option[:global]
                 end
-              end
-
-              unless user_help_long || user_help_short
-                option_rows << {"help", 'h', "Show this help", false}
               end
 
               member_pairs = [] of Nil
@@ -139,19 +139,39 @@ module Kebab
             %}
 
             %path = parent_path + [{{command_name}}]
+
+            # This command's own `global: true` options, propagated down so a
+            # subcommand's help/completion lists the globals usable there too.
+            %own_globals = [
+              {% for global_row in global_rows %}
+                ::Kebab::Schema::Option.new(
+                  long: {{global_row[0]}},
+                  short: {{global_row[1]}},
+                  description: {{global_row[2]}},
+                  takes_value: {{global_row[3]}},
+                ),
+              {% end %}
+            ] of ::Kebab::Schema::Option
+
+            %options = [
+              {% for option_row in option_rows %}
+                ::Kebab::Schema::Option.new(
+                  long: {{option_row[0]}},
+                  short: {{option_row[1]}},
+                  description: {{option_row[2]}},
+                  takes_value: {{option_row[3]}},
+                ),
+              {% end %}
+            ] of ::Kebab::Schema::Option
+            inherited_globals.each { |inherited_global| %options << inherited_global }
+            {% unless user_help_long || user_help_short %}
+              %options << ::Kebab::Schema::Option.new(long: "help", short: 'h', description: "Show this help", takes_value: false)
+            {% end %}
+
             ::Kebab::Schema::Command.new(
               path: %path,
               summary: {{summary}},
-              options: [
-                {% for option_row in option_rows %}
-                  ::Kebab::Schema::Option.new(
-                    long: {{option_row[0]}},
-                    short: {{option_row[1]}},
-                    description: {{option_row[2]}},
-                    takes_value: {{option_row[3]}},
-                  ),
-                {% end %}
-              ] of ::Kebab::Schema::Option,
+              options: %options,
               arguments: [
                 {% for argument_row in argument_rows %}
                   ::Kebab::Schema::Argument.new({{argument_row[0]}}, {{argument_row[1]}}, {{argument_row[2]}}),
@@ -159,20 +179,21 @@ module Kebab
               ] of ::Kebab::Schema::Argument,
               subcommands: [
                 {% for member_pair in member_pairs %}
-                  {{member_pair[1]}}.__kebab_schema(%path),
+                  {{member_pair[1]}}.__kebab_schema(%path, inherited_globals + %own_globals),
                 {% end %}
                 {% if !member_pairs.empty? && !user_help_subcommand %}
                   ::Kebab::Schema::Command.new(path: %path + ["help"], summary: "Show this help"),
                 {% end %}
               ] of ::Kebab::Schema::Command,
-              has_options: {{has_declared_options}},
+              has_options: {{has_declared_options}} || !inherited_globals.empty?,
               requires_subcommand: {{requires_subcommand}},
             )
           {% end %}
         end
 
-        def initialize(*, __kebab_args args : Array(String), __kebab_parent_path parent_path : Array(String) = [] of String)
+        def initialize(*, __kebab_args args : Array(String), __kebab_parent_path parent_path : Array(String) = [] of String, __kebab_inherited_globals inherited_globals : Array(::Kebab::Schema::Option) = [] of ::Kebab::Schema::Option)
           @__kebab_parent_path = parent_path
+          @__kebab_inherited_globals = inherited_globals
           __kebab_validate_schema
 
           {% begin %}
@@ -234,6 +255,155 @@ module Kebab
 
               {% if subcommand_ivar %}
                 %value{subcommand_ivar.name} : ::Union({{subcommand_members.splat}}, ::Nil) = nil
+              {% end %}
+
+              # Pull this command's `global: true` options out of `args` wherever
+              # they appear (up to a `--`), so they're accepted after subcommands
+              # too. The remaining args parse normally below.
+              {%
+                global_ivars = option_ivars.select { |option_ivar| option_ivar.annotation(::Kebab::Option) && option_ivar.annotation(::Kebab::Option)[:global] }
+                global_short_ivars = global_ivars.select { |option_ivar| option_ivar.annotation(::Kebab::Option)[:short] }
+              %}
+              {% unless global_ivars.empty? %}
+                %kept = [] of ::String
+                %gindex = 0
+                %gseparated = false
+                while %gindex < args.size
+                  %graw = args[%gindex]
+                  if %gseparated
+                    %kept << %graw
+                  else
+                    %gtoken = ::Kebab::Token.classify(%graw)
+                    %gmatched = false
+                    case %gtoken
+                    in ::Kebab::Token::Separator
+                      %gseparated = true
+                      %kept << %graw
+                    in ::Kebab::Token::Positional
+                      %kept << %graw
+                    in ::Kebab::Token::Long
+                      case %gtoken.name
+                      {% for ivar in global_ivars %}
+                        {%
+                          option = ivar.annotation(::Kebab::Option)
+                          long = option[:long] || ivar.name.stringify.gsub(/_/, "-")
+                          short = option[:short]
+                          description = option[:description] || ""
+                          converter = option[:converter]
+                          base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
+                        %}
+                        when {{long}}
+                          %gmatched = true
+                          %schema{ivar.name} = ::Kebab::Schema::Option.new(long: {{long}}, short: {{short}}, description: {{description}}, takes_value: {{base != Bool}})
+                          unless %value{ivar.name}.nil?
+                            __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}, schema: __kebab_schema_node))
+                          end
+                          {% if base == Bool %}
+                            if %ginline = %gtoken.value
+                              __kebab_bail(::Kebab::Error::InvalidValue::Exact(Bool, {{@type}}).new(value: %ginline, source: %schema{ivar.name}, schema: __kebab_schema_node, target_name: "flag", reason: "flags don't accept inline values"))
+                            end
+                            %value{ivar.name} = true
+                          {% else %}
+                            %gvalue = %gtoken.value || __kebab_next_value(args, %gindex, %gseparated, %schema{ivar.name}).tap { %gindex += 1 }
+                            {% if converter %}
+                              %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %gvalue, converter: {{converter}})
+                            {% else %}
+                              %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %gvalue)
+                            {% end %}
+                          {% end %}
+                      {% end %}
+                      else
+                        # not a global of this command — leave it for the normal loop
+                      end
+                      %kept << %graw unless %gmatched
+                    in ::Kebab::Token::Shorts
+                      {% if global_short_ivars.empty? %}
+                        %kept << %graw
+                      {% else %}
+                        # Pull this command's global shorts out of the cluster and
+                        # rebuild the rest into a `-…` token for the normal loop.
+                        %gchars = %gtoken.chars
+                        %remaining = ""
+                        %glast_handled = false
+                        %gchars.each_char_with_index do |%gchar, %gchar_index|
+                          %glast = %gchar_index == %gchars.size - 1
+                          %ghandled = false
+                          case %gchar
+                          {% for ivar in global_short_ivars %}
+                            {%
+                              option = ivar.annotation(::Kebab::Option)
+                              long = option[:long] || ivar.name.stringify.gsub(/_/, "-")
+                              short = option[:short]
+                              description = option[:description] || ""
+                              converter = option[:converter]
+                              base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
+                            %}
+                            when {{short}}
+                              {% if base == Bool %}
+                                %schema{ivar.name} = ::Kebab::Schema::Option.new(long: {{long}}, short: {{short}}, description: {{description}}, takes_value: false)
+                                unless %value{ivar.name}.nil?
+                                  __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}, schema: __kebab_schema_node))
+                                end
+                                if %glast && (%ginline = %gtoken.value)
+                                  __kebab_bail(::Kebab::Error::InvalidValue::Exact(Bool, {{@type}}).new(value: %ginline, source: %schema{ivar.name}, schema: __kebab_schema_node, target_name: "flag", reason: "flags don't accept inline values"))
+                                end
+                                %value{ivar.name} = true
+                                %ghandled = true
+                              {% else %}
+                                # a value-taking short can only be extracted as the last char of the cluster
+                                if %glast
+                                  %schema{ivar.name} = ::Kebab::Schema::Option.new(long: {{long}}, short: {{short}}, description: {{description}}, takes_value: true)
+                                  unless %value{ivar.name}.nil?
+                                    __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}, schema: __kebab_schema_node))
+                                  end
+                                  %gvalue = %gtoken.value || __kebab_next_value(args, %gindex, %gseparated, %schema{ivar.name}).tap { %gindex += 1 }
+                                  {% if converter %}
+                                    %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %gvalue, converter: {{converter}})
+                                  {% else %}
+                                    %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %gvalue)
+                                  {% end %}
+                                  %ghandled = true
+                                end
+                              {% end %}
+                          {% end %}
+                          else
+                          end
+                          if %ghandled
+                            %glast_handled = true if %glast
+                          else
+                            %remaining += %gchar
+                          end
+                        end
+                        unless %remaining.empty?
+                          %rebuilt = "-#{%remaining}"
+                          if !%glast_handled && (%ginline_rest = %gtoken.value)
+                            %rebuilt = "#{%rebuilt}=#{%ginline_rest}"
+                          end
+                          %kept << %rebuilt
+                        end
+                      {% end %}
+                    end
+                  end
+                  %gindex += 1
+                end
+                args = %kept
+              {% end %}
+
+              {% if subcommand_ivar %}
+                # This command's own globals, handed to subcommands so their help
+                # and errors list the globals usable there too.
+                %own_globals = [
+                  {% for ivar in global_ivars %}
+                    {%
+                      option = ivar.annotation(::Kebab::Option)
+                      long = option[:long] || ivar.name.stringify.gsub(/_/, "-")
+                      short = option[:short]
+                      description = option[:description] || ""
+                      base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
+                    %}
+                    ::Kebab::Schema::Option.new(long: {{long}}, short: {{short}}, description: {{description}}, takes_value: {{base != Bool}}),
+                  {% end %}
+                ] of ::Kebab::Schema::Option
               {% end %}
 
               {% unless subcommand_ivar %}
@@ -375,7 +545,7 @@ module Kebab
                     {% end %}
                     {% for member, member_index in subcommand_members %}
                       when {{subcommand_names[member_index]}}
-                        case %subcommand = {{member}}.__kebab_parse(args[(%index + 1)..], @__kebab_parent_path + [{{own_command_name}}])
+                        case %subcommand = {{member}}.__kebab_parse(args[(%index + 1)..], @__kebab_parent_path + [{{own_command_name}}], @__kebab_inherited_globals + %own_globals)
                         when {{member}}
                           %value{subcommand_ivar.name} = %subcommand
                         when ::Kebab::Help
@@ -514,7 +684,7 @@ module Kebab
         end
 
         private def __kebab_help_text : String
-          node = self.class.__kebab_schema(@__kebab_parent_path)
+          node = self.class.__kebab_schema(@__kebab_parent_path, @__kebab_inherited_globals)
 
           ::String.build do |io|
             unless node.summary.empty?
@@ -545,7 +715,7 @@ module Kebab
         end
 
         private def __kebab_schema_node : ::Kebab::Schema::Command
-          self.class.__kebab_schema(@__kebab_parent_path)
+          self.class.__kebab_schema(@__kebab_parent_path, @__kebab_inherited_globals)
         end
 
         private def __kebab_next_value(args : Array(String), index : Int32, separated : Bool, option : ::Kebab::Schema::Option) : String

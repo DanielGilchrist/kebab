@@ -2,7 +2,7 @@ module Kebab
   module Parseable
     macro __kebab_validate_schema
       {%
-        allowed_option_keys = ["short", "long", "description", "converter"]
+        allowed_option_keys = ["short", "long", "description", "converter", "global"]
         allowed_argument_keys = ["name", "description", "converter"]
         allowed_subcommand_keys = ["required"]
         allowed_command_keys = ["name", "summary"]
@@ -95,6 +95,9 @@ module Kebab
             end
             if (converter = option[:converter]) && !(converter.is_a?(Path) || converter.is_a?(Generic) || converter.is_a?(TypeNode))
               raise "@[Kebab::Option(converter:)] on '#{ivar.name}' must be a type name like `MyConverter`, got `#{converter}`."
+            end
+            if (global = option[:global]) && !global.is_a?(BoolLiteral)
+              raise "@[Kebab::Option(global:)] on '#{ivar.name}' must be true or false, got `#{global}`."
             end
             bases = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil } : [ivar.type]
             if bases.size != 1
@@ -201,7 +204,51 @@ module Kebab
             seen_subcommand_names[name] = member.name.stringify
           end
         end
+
+        global_clash_names = [] of String
+        seen_options.each do |ivar|
+          option = ivar.annotation(::Kebab::Option)
+          if option && option[:global]
+            global_clash_names << "--#{(option[:long] || ivar.name.stringify.gsub(/_/, "-")).id}"
+            global_clash_names << "-#{option[:short].id}" if option[:short]
+          end
+        end
       %}
+
+      {% unless global_clash_names.empty? %}
+        __kebab_assert_no_global_clash({{@type}}, {{global_clash_names}})
+      {% end %}
+    end
+
+    # Walks `type`'s subcommand subtree and fails compilation if a descendant
+    # command reuses a `global: true` option's long name or short letter — the
+    # declaring command swallows it everywhere in its subtree, so the descendant
+    # could never receive its own copy.
+    macro __kebab_assert_no_global_clash(type, names)
+      {% for ivar in type.resolve.instance_vars %}
+        {% if ivar.annotation(::Kebab::Subcommand) %}
+          {% members = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil } : [ivar.type] %}
+          {% for member in members %}
+            {% for member_ivar in member.resolve.instance_vars %}
+              {% if option = member_ivar.annotation(::Kebab::Option) %}
+                {% member_long = "--#{(option[:long] || member_ivar.name.stringify.gsub(/_/, "-")).id}" %}
+                {% if names.includes?(member_long) %}
+                  {% raise "Global option #{member_long.id} (declared on an ancestor command) is redeclared by '#{member_ivar.name}' on #{member}. " \
+                           "A global option is recognised throughout its declaring command's subtree, so a descendant can't reuse its name." %}
+                {% end %}
+                {% if option[:short] %}
+                  {% member_short = "-#{option[:short].id}" %}
+                  {% if names.includes?(member_short) %}
+                    {% raise "Global option #{member_short.id} (declared on an ancestor command) is redeclared by '#{member_ivar.name}' on #{member}. " \
+                             "A global option is recognised throughout its declaring command's subtree, so a descendant can't reuse its short letter." %}
+                  {% end %}
+                {% end %}
+              {% end %}
+            {% end %}
+            __kebab_assert_no_global_clash({{member}}, {{names}})
+          {% end %}
+        {% end %}
+      {% end %}
     end
   end
 end
