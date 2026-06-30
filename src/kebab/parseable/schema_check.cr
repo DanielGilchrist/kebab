@@ -191,6 +191,12 @@ module Kebab
         subcommand_ivar = seen_subcommands.first
         if subcommand_ivar
           subcommand_members = subcommand_ivar.type.union? ? subcommand_ivar.type.union_types : [subcommand_ivar.type]
+          subcommand_members.each do |member|
+            unless member.resolve.ancestors.includes?(::Kebab::Parseable)
+              raise "@[Kebab::Subcommand] field '#{subcommand_ivar.name}' on #{@type} includes #{member}, which isn't a command. " \
+                    "Every type in a subcommand union must `include Kebab::Parseable`."
+            end
+          end
           subcommand_names = subcommand_members.map do |member|
             (member.annotation(::Kebab::Command) && member.annotation(::Kebab::Command)[:name]) || member.name.stringify.split("::").last.underscore
           end
