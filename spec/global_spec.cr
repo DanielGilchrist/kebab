@@ -129,21 +129,40 @@ describe "Kebab::Parseable global options" do
     nested_week.options.map(&.long).should contain("no-colour")
   end
 
-  it "extracts a global short from a cluster, leaving the rest for the subcommand" do
-    root = GlobalSpecCluster.parse(["go", "-vf"]).as(GlobalSpecCluster)
+  it "accepts a standalone global short after a subcommand" do
+    root = GlobalSpecCluster.parse(["go", "-v"]).as(GlobalSpecCluster)
+    root.verbose?.should be_true
+    root.command.as(GlobalSpecGo).force?.should be_false
+  end
+
+  it "accepts a standalone global short alongside a subcommand's own short" do
+    root = GlobalSpecCluster.parse(["go", "-v", "-f"]).as(GlobalSpecCluster)
     root.verbose?.should be_true
     root.command.as(GlobalSpecGo).force?.should be_true
   end
 
-  it "extracts a global short regardless of its position in the cluster" do
-    root = GlobalSpecCluster.parse(["go", "-fv"]).as(GlobalSpecCluster)
-    root.verbose?.should be_true
-    root.command.as(GlobalSpecGo).force?.should be_true
-  end
-
-  it "leaves a cluster untouched when it has no global short" do
+  it "leaves a non-global short for the subcommand" do
     root = GlobalSpecCluster.parse(["go", "-f"]).as(GlobalSpecCluster)
     root.verbose?.should be_false
     root.command.as(GlobalSpecGo).force?.should be_true
+  end
+
+  it "does not split a global short out of a cluster after a subcommand" do
+    # `-vf` mixes the global -v with the subcommand's own short; it's left intact,
+    # so the subcommand sees the unknown -v. Use `-v` standalone instead.
+    GlobalSpecCluster.parse(["go", "-vf"]).as(Kebab::Errors).should be_a(Kebab::Error::UnknownOption)
+  end
+
+  it "errors when a value global is given no value, even after a subcommand" do
+    GlobalSpecRoot.parse(["week", "--scope"]).as(Kebab::Errors).should be_a(Kebab::Error::MissingValue)
+  end
+
+  it "errors when a value global's value would be another flag" do
+    GlobalSpecRoot.parse(["week", "--scope", "--no-colour"]).as(Kebab::Errors).should be_a(Kebab::Error::MissingValue)
+  end
+
+  it "does not consume a token that preceded the value global" do
+    # `week --scope` must not treat `week` (the subcommand) as scope's value
+    GlobalSpecRoot.parse(["week", "--scope"]).should_not be_a(GlobalSpecRoot)
   end
 end

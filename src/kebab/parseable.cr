@@ -257,141 +257,12 @@ module Kebab
                 %value{subcommand_ivar.name} : ::Union({{subcommand_members.splat}}, ::Nil) = nil
               {% end %}
 
-              # Pull this command's `global: true` options out of `args` wherever
-              # they appear (up to a `--`), so they're accepted after subcommands
-              # too. The remaining args parse normally below.
-              {%
-                global_ivars = option_ivars.select { |option_ivar| option_ivar.annotation(::Kebab::Option) && option_ivar.annotation(::Kebab::Option)[:global] }
-                global_short_ivars = global_ivars.select { |option_ivar| option_ivar.annotation(::Kebab::Option)[:short] }
-              %}
-              {% unless global_ivars.empty? %}
-                %kept = [] of ::String
-                %gindex = 0
-                %gseparated = false
-                while %gindex < args.size
-                  %graw = args[%gindex]
-                  if %gseparated
-                    %kept << %graw
-                  else
-                    %gtoken = ::Kebab::Token.classify(%graw)
-                    %gmatched = false
-                    case %gtoken
-                    in ::Kebab::Token::Separator
-                      %gseparated = true
-                      %kept << %graw
-                    in ::Kebab::Token::Positional
-                      %kept << %graw
-                    in ::Kebab::Token::Long
-                      case %gtoken.name
-                      {% for ivar in global_ivars %}
-                        {%
-                          option = ivar.annotation(::Kebab::Option)
-                          long = option[:long] || ivar.name.stringify.gsub(/_/, "-")
-                          short = option[:short]
-                          description = option[:description] || ""
-                          converter = option[:converter]
-                          base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
-                        %}
-                        when {{long}}
-                          %gmatched = true
-                          %schema{ivar.name} = ::Kebab::Schema::Option.new(long: {{long}}, short: {{short}}, description: {{description}}, takes_value: {{base != Bool}})
-                          unless %value{ivar.name}.nil?
-                            __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}, schema: __kebab_schema_node))
-                          end
-                          {% if base == Bool %}
-                            if %ginline = %gtoken.value
-                              __kebab_bail(::Kebab::Error::InvalidValue::Exact(Bool, {{@type}}).new(value: %ginline, source: %schema{ivar.name}, schema: __kebab_schema_node, target_name: "flag", reason: "flags don't accept inline values"))
-                            end
-                            %value{ivar.name} = true
-                          {% else %}
-                            %gvalue = %gtoken.value || __kebab_next_value(args, %gindex, %gseparated, %schema{ivar.name}).tap { %gindex += 1 }
-                            {% if converter %}
-                              %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %gvalue, converter: {{converter}})
-                            {% else %}
-                              %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %gvalue)
-                            {% end %}
-                          {% end %}
-                      {% end %}
-                      else
-                        # not a global of this command — leave it for the normal loop
-                      end
-                      %kept << %graw unless %gmatched
-                    in ::Kebab::Token::Shorts
-                      {% if global_short_ivars.empty? %}
-                        %kept << %graw
-                      {% else %}
-                        # Pull this command's global shorts out of the cluster and
-                        # rebuild the rest into a `-…` token for the normal loop.
-                        %gchars = %gtoken.chars
-                        %remaining = ""
-                        %glast_handled = false
-                        %gchars.each_char_with_index do |%gchar, %gchar_index|
-                          %glast = %gchar_index == %gchars.size - 1
-                          %ghandled = false
-                          case %gchar
-                          {% for ivar in global_short_ivars %}
-                            {%
-                              option = ivar.annotation(::Kebab::Option)
-                              long = option[:long] || ivar.name.stringify.gsub(/_/, "-")
-                              short = option[:short]
-                              description = option[:description] || ""
-                              converter = option[:converter]
-                              base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
-                            %}
-                            when {{short}}
-                              {% if base == Bool %}
-                                %schema{ivar.name} = ::Kebab::Schema::Option.new(long: {{long}}, short: {{short}}, description: {{description}}, takes_value: false)
-                                unless %value{ivar.name}.nil?
-                                  __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}, schema: __kebab_schema_node))
-                                end
-                                if %glast && (%ginline = %gtoken.value)
-                                  __kebab_bail(::Kebab::Error::InvalidValue::Exact(Bool, {{@type}}).new(value: %ginline, source: %schema{ivar.name}, schema: __kebab_schema_node, target_name: "flag", reason: "flags don't accept inline values"))
-                                end
-                                %value{ivar.name} = true
-                                %ghandled = true
-                              {% else %}
-                                # a value-taking short can only be extracted as the last char of the cluster
-                                if %glast
-                                  %schema{ivar.name} = ::Kebab::Schema::Option.new(long: {{long}}, short: {{short}}, description: {{description}}, takes_value: true)
-                                  unless %value{ivar.name}.nil?
-                                    __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{ivar.name}, schema: __kebab_schema_node))
-                                  end
-                                  %gvalue = %gtoken.value || __kebab_next_value(args, %gindex, %gseparated, %schema{ivar.name}).tap { %gindex += 1 }
-                                  {% if converter %}
-                                    %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %gvalue, converter: {{converter}})
-                                  {% else %}
-                                    %value{ivar.name} = __kebab_convert({{base}}, %schema{ivar.name}, %gvalue)
-                                  {% end %}
-                                  %ghandled = true
-                                end
-                              {% end %}
-                          {% end %}
-                          else
-                          end
-                          if %ghandled
-                            %glast_handled = true if %glast
-                          else
-                            %remaining += %gchar
-                          end
-                        end
-                        unless %remaining.empty?
-                          %rebuilt = "-#{%remaining}"
-                          if !%glast_handled && (%ginline_rest = %gtoken.value)
-                            %rebuilt = "#{%rebuilt}=#{%ginline_rest}"
-                          end
-                          %kept << %rebuilt
-                        end
-                      {% end %}
-                    end
-                  end
-                  %gindex += 1
-                end
-                args = %kept
-              {% end %}
-
-              {% if subcommand_ivar %}
-                # This command's own globals, handed to subcommands so their help
-                # and errors list the globals usable there too.
+              # `%own_globals` is this command's `global: true` options as schema
+              # specs. It drives `__kebab_hoist_globals` (which pulls them ahead of
+              # any subcommand so they parse after subcommands too) and is handed to
+              # subcommands so their help and completion list them.
+              {% global_ivars = option_ivars.select { |option_ivar| option_ivar.annotation(::Kebab::Option) && option_ivar.annotation(::Kebab::Option)[:global] } %}
+              {% if !global_ivars.empty? || subcommand_ivar %}
                 %own_globals = [
                   {% for ivar in global_ivars %}
                     {%
@@ -404,6 +275,9 @@ module Kebab
                     ::Kebab::Schema::Option.new(long: {{long}}, short: {{short}}, description: {{description}}, takes_value: {{base != Bool}}),
                   {% end %}
                 ] of ::Kebab::Schema::Option
+              {% end %}
+              {% unless global_ivars.empty? %}
+                args = __kebab_hoist_globals(args, %own_globals)
               {% end %}
 
               {% unless subcommand_ivar %}
@@ -716,6 +590,59 @@ module Kebab
 
         private def __kebab_schema_node : ::Kebab::Schema::Command
           self.class.__kebab_schema(@__kebab_parent_path, @__kebab_inherited_globals)
+        end
+
+        # Moves this command's global options ahead of any subcommand, so they're recognised after subcommands too.
+        # For subcommands with a value, its value is hoisted with it.
+        private def __kebab_hoist_globals(args : Array(String), globals : Array(::Kebab::Schema::Option)) : Array(String)
+          front = [] of String
+          rest = [] of String
+          index = 0
+          separated = false
+          while index < args.size
+            raw = args[index]
+            if separated
+              rest << raw
+            else
+              matched : ::Kebab::Schema::Option? = nil
+              inline : String? = nil
+              case token = ::Kebab::Token.classify(raw)
+              in ::Kebab::Token::Separator
+                separated = true
+              in ::Kebab::Token::Positional
+                # leave for the normal loop
+              in ::Kebab::Token::Long
+                inline = token.value
+                matched = globals.find { |option| option.long == token.name }
+              in ::Kebab::Token::Shorts
+                if token.chars.size == 1
+                  inline = token.value
+                  letter = token.chars[0]
+                  matched = globals.find { |option| option.short == letter }
+                end
+              end
+
+              if option = matched
+                front << raw
+                if option.takes_value? && inline.nil?
+                  value = args[index + 1]?
+                  if value && ::Kebab::Token.classify(value).is_a?(::Kebab::Token::Positional)
+                    front << value
+                    index += 1
+                  else
+                    {% begin %}
+                      __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(option, schema: __kebab_schema_node))
+                    {% end %}
+                  end
+                end
+              else
+                rest << raw
+              end
+            end
+            index += 1
+          end
+
+          front + rest
         end
 
         private def __kebab_next_value(args : Array(String), index : Int32, separated : Bool, option : ::Kebab::Schema::Option) : String

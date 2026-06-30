@@ -119,7 +119,7 @@ global is also listed in its subcommands' help and completion, since it's usable
 there too.
 
 Collection stops at `--`. A global is recognised throughout its declaring
-command's subtree, so a descendant can't reuse its name or short letter — that's
+command's subtree, so a descendant can't reuse its name or short letter. That's
 a compile error, not a silent shadow. See [`examples/global/`](examples/global/).
 
 ## Shell completion

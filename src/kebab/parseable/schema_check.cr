@@ -221,7 +221,7 @@ module Kebab
     end
 
     # Walks `type`'s subcommand subtree and fails compilation if a descendant
-    # command reuses a `global: true` option's long name or short letter — the
+    # command reuses a `global: true` option's long name or short letter. The
     # declaring command swallows it everywhere in its subtree, so the descendant
     # could never receive its own copy.
     macro __kebab_assert_no_global_clash(type, names)
