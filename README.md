@@ -87,7 +87,40 @@ Runnable walkthroughs in [`examples/`](examples/):
 - [`examples/errors/`](examples/errors/) — typed error dispatch in parsing mode.
 - [`examples/suggestions/`](examples/suggestions/) — in-command error handlers with "did you mean" hints.
 - [`examples/completions/`](examples/completions/) — generating fish, bash, and zsh completions.
+- [`examples/global/`](examples/global/) — options usable anywhere in a command's subtree with `global: true`.
 - [`examples/testing/`](examples/testing/) — testing commands with parse, injected dependencies, and captured IO.
+
+## Global options
+
+By default an option is only recognised before its command's subcommand
+(`app --verbose start`, not `app start --verbose`). Mark it `global: true` to
+accept it anywhere in that command's portion of the line, including after
+subcommands:
+
+```crystal
+struct App
+  include Kebab::Parseable
+
+  @[Kebab::Option(global: true)]
+  getter? no_colour : Bool = false
+
+  @[Kebab::Subcommand]
+  getter command : Start | Finish
+end
+
+# all set no_colour? on the App instance:
+App.parse(["--no-colour", "start"])
+App.parse(["start", "--no-colour"])
+```
+
+The value lives on the declaring command's instance, so in command mode read it
+there and thread it into the subcommand's `run` like any other dependency. A
+global is also listed in its subcommands' help and completion, since it's usable
+there too.
+
+Collection stops at `--`. A global is recognised throughout its declaring
+command's subtree, so a descendant can't reuse its name or short letter. That's
+a compile error, not a silent shadow. See [`examples/global/`](examples/global/).
 
 ## Shell completion
 
