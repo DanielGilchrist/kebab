@@ -77,18 +77,44 @@ end
 exit(1) unless Greet.run(ARGV)
 ```
 
+## Field types and conversion
+
+A field's type sets how its value parses:
+
+- `String` and the number types (`Int32`, `Float64`) are built in.
+- `Bool` is a flag, never a value.
+- Enums parse automatically. Matching is case-insensitive and treats `-` and `_` the same. An unknown value errors with the valid names.
+- `Array(T)` collects the remaining positionals, each parsed as `T`.
+
+Other types need a `converter:`, a type or module with `self.parse(input : String) : T | Kebab::Convert::Failure`:
+
+```crystal
+struct Duration
+  def self.parse(input : String) : Duration | Kebab::Convert::Failure
+    minutes = input.to_i?
+    return Kebab::Convert.failure("expected a number of minutes") unless minutes
+    new(minutes)
+  end
+end
+
+@[Kebab::Option(converter: Duration)]
+getter pause : Duration?
+```
+
+An unsupported type with no `converter:` is a compile error.
+
 ## Examples
 
 Runnable walkthroughs in [`examples/`](examples/):
 
-- [`examples/parsing/`](examples/parsing/) — kebab as a pure parser, no `def run`.
-- [`examples/command/`](examples/command/) — single-command pattern with `Type.run`.
-- [`examples/subcommands/`](examples/subcommands/) — multi-level command tree.
-- [`examples/errors/`](examples/errors/) — typed error dispatch in parsing mode.
-- [`examples/suggestions/`](examples/suggestions/) — in-command error handlers with "did you mean" hints.
-- [`examples/completions/`](examples/completions/) — generating fish, bash, and zsh completions.
-- [`examples/global/`](examples/global/) — options usable anywhere in a command's subtree with `global: true`.
-- [`examples/testing/`](examples/testing/) — testing commands with parse, injected dependencies, and captured IO.
+- [`examples/parsing/`](examples/parsing/): kebab as a pure parser, no `def run`.
+- [`examples/command/`](examples/command/): single-command pattern with `Type.run`.
+- [`examples/subcommands/`](examples/subcommands/): multi-level command tree.
+- [`examples/errors/`](examples/errors/): typed error dispatch in parsing mode.
+- [`examples/suggestions/`](examples/suggestions/): in-command error handlers with "did you mean" hints.
+- [`examples/completions/`](examples/completions/): generating fish, bash, and zsh completions.
+- [`examples/global/`](examples/global/): options usable anywhere in a command's subtree with `global: true`.
+- [`examples/testing/`](examples/testing/): testing commands with parse, injected dependencies, and captured IO.
 
 ## Global options
 
@@ -132,7 +158,7 @@ zsh. Expose it as a subcommand with a typed shell argument:
 struct Completions
   include Kebab::Parseable
 
-  @[Kebab::Argument(converter: Kebab::Convert::Enum(Kebab::Completion::Shell))]
+  @[Kebab::Argument]
   getter shell : Kebab::Completion::Shell
 
   def run : Nil
