@@ -19,7 +19,7 @@ crystal run main.cr -- list --all
 
 ## How it works
 
-The shell is a typed argument: `getter shell : Kebab::Completion::Shell`, parsed with `Kebab::Convert::Enum`. An unknown shell fails at parse time with `one of: fish, bash, zsh`, so there is no string matching to write.
+The shell is a typed argument (`getter shell : Kebab::Completion::Shell`). Enums parse automatically, so an unknown shell fails at parse time with `one of: fish, bash, zsh`.
 
 `Todo.parse` returns the parsed command, and the `completions` subcommand is handled like any other:
 
@@ -55,7 +55,7 @@ source <(todo completions zsh)
 
 ## Other shells
 
-`Kebab::Completion::Shell` is a convenience for the shells kebab ships, not a requirement. A completion script is built from `Todo.schema`, so a shell kebab doesn't cover is just a script you generate from it, wired up however suits you.
+`Kebab::Completion::Shell` covers the shells kebab ships. A completion script is built from `Todo.schema`, so for any other shell you generate the script yourself.
 
 If you want the same typed-argument pattern for an extra shell, define your own enum and dispatch to the built-ins plus your own generator:
 
@@ -79,9 +79,9 @@ enum AppShell
 end
 ```
 
-Then parse it with the same converter, using your enum in place of `Kebab::Completion::Shell`:
+Then parse it as a typed argument, using your enum in place of `Kebab::Completion::Shell`:
 
 ```crystal
-@[Kebab::Argument(converter: Kebab::Convert::Enum(AppShell))]
+@[Kebab::Argument]
 getter shell : AppShell
 ```

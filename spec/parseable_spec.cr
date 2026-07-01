@@ -38,7 +38,7 @@ private struct Punch
   @[Kebab::Option(converter: UpcaseConverter)]
   getter shout : String?
 
-  @[Kebab::Option(long: "duration")]
+  @[Kebab::Option(long: "duration", converter: SpecDuration)]
   getter pause : SpecDuration?
 end
 
@@ -356,7 +356,7 @@ end
 private struct EnumHaver
   include Kebab::Parseable
 
-  @[Kebab::Option(converter: Kebab::Convert::Enum(SpecOutputFormat))]
+  @[Kebab::Option]
   getter format : SpecOutputFormat = SpecOutputFormat::Text
 end
 
@@ -507,7 +507,7 @@ describe "Kebab::Parseable in-command error handlers" do
   end
 end
 
-describe Kebab::Convert::Enum do
+describe "enum conversion" do
   it "parses a matching enum value (case-insensitive)" do
     EnumHaver.parse(["--format", "json"]).as(EnumHaver).format.should eq(SpecOutputFormat::Json)
     EnumHaver.parse(["--format", "YAML"]).as(EnumHaver).format.should eq(SpecOutputFormat::Yaml)

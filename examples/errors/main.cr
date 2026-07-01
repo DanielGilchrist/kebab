@@ -13,7 +13,7 @@ struct Query
   @[Kebab::Argument(description: "Query text")]
   getter text : String
 
-  @[Kebab::Option(short: 'f', description: "Output format", converter: Kebab::Convert::Enum(OutputFormat))]
+  @[Kebab::Option(short: 'f', description: "Output format")]
   getter format : OutputFormat = OutputFormat::Text
 
   @[Kebab::Option(short: 'l', description: "Result limit (1-1000)")]
