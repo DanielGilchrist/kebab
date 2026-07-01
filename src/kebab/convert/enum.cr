@@ -2,8 +2,8 @@ require "./failure"
 
 module Kebab
   module Convert
-    # Generic converter for Crystal enums. Use as
-    # `@[Kebab::Option(converter: Kebab::Convert::Enum(MyEnum))]`.
+    # Converter for Crystal enums. Enum-typed fields use it automatically.
+    # Naming it as a `converter:` is equivalent.
     # Member names are matched with `Enum.parse?` (case-insensitive, `-`/`_` equivalent),
     # so `MyEnum::ApprovalRequested` accepts `"approval_requested"`:
     # https://crystal-lang.org/api/Enum.html#parse%28string%3AString%29%3Aself-class-method

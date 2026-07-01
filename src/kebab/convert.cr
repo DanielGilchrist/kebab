@@ -1,3 +1,4 @@
+require "./convert/enum"
 require "./convert/failure"
 
 module Kebab
@@ -35,7 +36,11 @@ module Kebab
     {% end %}
 
     def parse(type : T.class, raw : String) : T | Failure forall T
-      type.parse(raw)
+      {% if T < ::Enum %}
+        ::Kebab::Convert::Enum(T).parse(raw)
+      {% else %}
+        {% raise "kebab has no built-in conversion for #{T}. Give the field a `converter:` (see Kebab::Convert), or use a built-in type (String, a number, or an enum)." %}
+      {% end %}
     end
   end
 end
