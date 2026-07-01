@@ -70,7 +70,13 @@ module Kebab
             if (converter = argument[:converter]) && !(converter.is_a?(Path) || converter.is_a?(Generic) || converter.is_a?(TypeNode))
               raise "@[Kebab::Argument(converter:)] on '#{ivar.name}' must be a type name like `MyConverter`, got `#{converter}`."
             end
-            base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
+            argument_bases = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil } : [ivar.type]
+            if argument_bases.size != 1
+              raise "Field '#{ivar.name}' on #{@type} has an unsupported type: `#{ivar.type}`. " \
+                    "A field's type must be a single type, optionally nilable (like `String?` or `Int32 = 0`). " \
+                    "For dispatching across multiple command types, use @[Kebab::Subcommand]."
+            end
+            base = argument_bases.first
             if base == Bool
               raise "@[Kebab::Argument] '#{ivar.name}' has type Bool. Bool fields can't be positional. Use @[Kebab::Option] for flags."
             end
@@ -112,6 +118,45 @@ module Kebab
           end
         end
 
+        option_specs = seen_options.map do |ivar|
+          option = ivar.annotation(::Kebab::Option)
+          bases = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil } : [ivar.type]
+          {
+            ivar:         ivar,
+            name:         ivar.name.stringify,
+            long:         (option && option[:long]) || ivar.name.stringify.gsub(/_/, "-"),
+            short:        option && option[:short],
+            converter:    option && option[:converter],
+            global:       option && option[:global],
+            convert_type: bases.first,
+          }
+        end
+        argument_specs = seen_arguments.map do |ivar|
+          argument = ivar.annotation(::Kebab::Argument)
+          bases = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil } : [ivar.type]
+          base = bases.first
+          variadic = base.name(generic_args: false).stringify == "Array"
+          {
+            ivar:         ivar,
+            name:         ivar.name.stringify,
+            arg_name:     (argument && argument[:name]) || ivar.name.stringify.gsub(/_/, "-"),
+            converter:    argument && argument[:converter],
+            variadic:     variadic,
+            convert_type: variadic ? base.type_vars.first : base,
+          }
+        end
+
+        (option_specs + argument_specs).each do |spec|
+          type = spec[:convert_type]
+          unless spec[:converter] || type == Bool
+            ancestors = type.resolve.ancestors
+            unless type == String || ancestors.includes?(::Number) || ancestors.includes?(::Enum)
+              raise "Field '#{spec[:name].id}' on #{@type} has type `#{type}`, which kebab can't convert. " \
+                    "Add a `converter:` (see Kebab::Convert), or use a built-in type (String, a number, or an enum)."
+            end
+          end
+        end
+
         if command = @type.annotation(::Kebab::Command)
           command.named_args.keys.each do |key|
             unless allowed_command_keys.includes?(key.stringify)
@@ -136,54 +181,44 @@ module Kebab
         end
 
         long_names = {} of String => String
-        seen_options.each do |ivar|
-          option = ivar.annotation(::Kebab::Option)
-          long = (option && option[:long]) || ivar.name.stringify.gsub(/_/, "-")
-          if existing = long_names[long]
-            raise "Duplicate long option --#{long.id} on #{@type}: '#{existing.id}' and '#{ivar.name}' both use it."
+        option_specs.each do |spec|
+          if existing = long_names[spec[:long]]
+            raise "Duplicate long option --#{spec[:long].id} on #{@type}: '#{existing.id}' and '#{spec[:name].id}' both use it."
           end
-          long_names[long] = ivar.name.stringify
+          long_names[spec[:long]] = spec[:name]
         end
 
         short_letters = {} of Char => String
-        seen_options.each do |ivar|
-          option = ivar.annotation(::Kebab::Option)
-          short = option && option[:short]
-          if short
+        option_specs.each do |spec|
+          if short = spec[:short]
             if existing = short_letters[short]
-              raise "Duplicate short option -#{short.id} on #{@type}: '#{existing.id}' and '#{ivar.name}' both use it."
+              raise "Duplicate short option -#{short.id} on #{@type}: '#{existing.id}' and '#{spec[:name].id}' both use it."
             end
-            short_letters[short] = ivar.name.stringify
+            short_letters[short] = spec[:name]
           end
         end
 
         argument_names = {} of String => String
-        seen_arguments.each do |ivar|
-          argument = ivar.annotation(::Kebab::Argument)
-          name = (argument && argument[:name]) || ivar.name.stringify.gsub(/_/, "-")
-          if existing = argument_names[name]
-            raise "Duplicate argument <#{name.id}> on #{@type}: '#{existing.id}' and '#{ivar.name}' both use it."
+        argument_specs.each do |spec|
+          if existing = argument_names[spec[:arg_name]]
+            raise "Duplicate argument <#{spec[:arg_name].id}> on #{@type}: '#{existing.id}' and '#{spec[:name].id}' both use it."
           end
-          argument_names[name] = ivar.name.stringify
+          argument_names[spec[:arg_name]] = spec[:name]
         end
 
-        variadic_arguments = [] of Nil
-        seen_arguments.each do |ivar|
-          base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
-          variadic_arguments << ivar if base.name(generic_args: false).stringify == "Array"
+        variadic_specs = argument_specs.select { |spec| spec[:variadic] }
+        if variadic_specs.size > 1
+          raise "#{@type} has #{variadic_specs.size} variadic Array(T) arguments. Only one is allowed."
         end
-        if variadic_arguments.size > 1
-          raise "#{@type} has #{variadic_arguments.size} variadic Array(T) arguments. Only one is allowed."
-        end
-        if variadic_arguments.size == 1 && variadic_arguments.first != seen_arguments.last
-          raise "Variadic Array(T) argument '#{variadic_arguments.first.name}' on #{@type} must be the last positional argument."
+        if variadic_specs.size == 1 && variadic_specs.first[:ivar] != seen_arguments.last
+          raise "Variadic Array(T) argument '#{variadic_specs.first[:name].id}' on #{@type} must be the last positional argument."
         end
 
         seen_optional_argument = false
-        seen_arguments.each do |ivar|
-          optional = ivar.type.nilable? || ivar.has_default_value?
+        argument_specs.each do |spec|
+          optional = spec[:ivar].type.nilable? || spec[:ivar].has_default_value?
           if seen_optional_argument && !optional
-            raise "Argument '#{ivar.name}' on #{@type} is required but comes after an optional argument. Required positionals have to come first."
+            raise "Argument '#{spec[:name].id}' on #{@type} is required but comes after an optional argument. Required positionals have to come first."
           end
           seen_optional_argument ||= optional
         end
@@ -212,11 +247,10 @@ module Kebab
         end
 
         global_clash_names = [] of String
-        seen_options.each do |ivar|
-          option = ivar.annotation(::Kebab::Option)
-          if option && option[:global]
-            global_clash_names << "--#{(option[:long] || ivar.name.stringify.gsub(/_/, "-")).id}"
-            global_clash_names << "-#{option[:short].id}" if option[:short]
+        option_specs.each do |spec|
+          if spec[:global]
+            global_clash_names << "--#{spec[:long].id}"
+            global_clash_names << "-#{spec[:short].id}" if spec[:short]
           end
         end
       %}
