@@ -73,6 +73,12 @@ describe Kebab::Completion::Shell do
       script.should contain("complete -c tri -n '__kebab_tri_at mid' -a 'deep'")
     end
 
+    it "skips a valued option's value when rebuilding the path" do
+      script = Kebab::Completion::Shell::Fish.generate(CompTasks.schema)
+      script.should contain("case '--priority' '-p'")
+      script.should contain("set skip 1")
+    end
+
     it "honours a binary-name override" do
       script = Kebab::Completion::Shell::Fish.generate(CompTasks.schema, "tw")
       script.should contain("complete -c tw -f")
@@ -87,6 +93,11 @@ describe Kebab::Completion::Shell do
       script.should contain("tasks__add)")
       script.should contain("compgen -W")
     end
+
+    it "skips a valued option's value when rebuilding the path" do
+      script = Kebab::Completion::Shell::Bash.generate(CompTasks.schema)
+      script.should contain("--priority|-p) ((i++)) ;;")
+    end
   end
 
   describe "#generate (zsh)" do
@@ -95,6 +106,11 @@ describe Kebab::Completion::Shell do
       script.should contain("#compdef tasks")
       script.should contain("tasks__add)")
       script.should contain("compadd --")
+    end
+
+    it "skips a valued option's value when rebuilding the path" do
+      script = Kebab::Completion::Shell::Zsh.generate(CompTasks.schema)
+      script.should contain("--priority|-p) ((i++)) ;;")
     end
   end
 

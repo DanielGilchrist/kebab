@@ -37,5 +37,22 @@ module Kebab
       end
       words
     end
+
+    # :nodoc:
+    # Every flag in the tree that takes a value, so the generated scripts can
+    # skip the value when rebuilding the command path from the typed words.
+    def valued_flags(node : ::Kebab::Schema::Command) : Array(String)
+      flags = [] of String
+      node.options.each do |option|
+        next unless option.takes_value?
+
+        flags << "--#{option.long}"
+        if short = option.short
+          flags << "-#{short}"
+        end
+      end
+      node.subcommands.each { |subcommand| flags.concat(valued_flags(subcommand)) }
+      flags.uniq!.sort!
+    end
   end
 end
