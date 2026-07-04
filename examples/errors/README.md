@@ -24,7 +24,7 @@ crystal run main.cr -- --bogus
 - command: `InvalidValue::For(C)`
 - both: `InvalidValue::Exact(T, C)`
 
-`main.cr` matches `Of(OutputFormat)` and `Of(Int32)` to give a targeted message per target type. The `when` arms cover the failures worth a custom message. Everything else falls to `else`, which prints kebab's default rendering of the error.
+`main.cr` matches `Of(OutputFormat)` and `Of(Int32)` to give a targeted message per target type. The `when` arms cover the failures worth a custom message.
 
 ### Other error types
 

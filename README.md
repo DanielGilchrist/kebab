@@ -181,9 +181,8 @@ eval "$(todo completions bash)"         # bash, in ~/.bashrc
 source <(todo completions zsh)          # zsh, in ~/.zshrc after compinit
 ```
 
-The enum is a convenience, not a requirement. A completion script is built from
-`Type.schema`, so a shell kebab doesn't ship is just a script you generate from
-it yourself, dispatched however you like. See
+A completion script is built from `Type.schema`, so for any other shell you
+generate the script yourself. See
 [`examples/completions/`](examples/completions/).
 
 ## Command structure

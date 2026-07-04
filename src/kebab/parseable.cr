@@ -509,7 +509,7 @@ module Kebab
         end
 
         # Moves this command's global options ahead of any subcommand, so they're recognised after subcommands too.
-        # For subcommands with a value, its value is hoisted with it.
+        # A global that takes a value has its value hoisted with it.
         private def __kebab_hoist_globals(args : Array(String), globals : Array(::Kebab::Schema::Option)) : Array(String)
           front = [] of String
           rest = [] of String

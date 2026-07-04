@@ -40,7 +40,7 @@ end
 
 ## Installing it
 
-Source it at shell startup so it tracks the current binary (re-run on each launch, never stale):
+Source it at shell startup so it tracks the current binary:
 
 ```sh
 # fish

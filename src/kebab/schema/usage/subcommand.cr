@@ -7,7 +7,7 @@ module Kebab
         end
 
         # Path of command names from the binary down to this command
-        # (e.g. `["tanda_cli", "clockin"]`).
+        # (e.g. `["tasks", "add"]`).
         getter command_path : Array(String)
 
         # `true` if the command declares any options.
