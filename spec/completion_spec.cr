@@ -27,6 +27,27 @@ private struct CompTasks
   getter command : CompAdd | CompList
 end
 
+@[Kebab::Command(name: "deep", summary: "Deep leaf")]
+private struct CompDeep
+  include Kebab::Parseable
+end
+
+@[Kebab::Command(name: "mid", summary: "Middle command")]
+private struct CompMid
+  include Kebab::Parseable
+
+  @[Kebab::Subcommand]
+  getter command : CompDeep
+end
+
+@[Kebab::Command(name: "tri", summary: "Three levels")]
+private struct CompTri
+  include Kebab::Parseable
+
+  @[Kebab::Subcommand]
+  getter command : CompMid
+end
+
 describe Kebab::Completion::Shell do
   describe "#generate (fish)" do
     it "disables file completion and names the binary from the schema" do
@@ -34,15 +55,22 @@ describe Kebab::Completion::Shell do
       script.should contain("complete -c tasks -f")
     end
 
-    it "offers subcommands gated to before a subcommand is chosen" do
+    it "offers root subcommands gated to the root path" do
       script = Kebab::Completion::Shell::Fish.generate(CompTasks.schema)
-      script.should contain("complete -c tasks -n '__fish_use_subcommand' -a 'add' -d 'Add a task'")
+      script.should contain("function __kebab_tasks_at")
+      script.should contain("complete -c tasks -n '__kebab_tasks_at' -a 'add' -d 'Add a task'")
       script.should contain("-a 'help' -d 'Show this help'")
     end
 
     it "scopes a subcommand's options to that subcommand, marking value options" do
       script = Kebab::Completion::Shell::Fish.generate(CompTasks.schema)
-      script.should contain("complete -c tasks -n '__fish_seen_subcommand_from add' -s p -l priority -d 'Priority' -r")
+      script.should contain("complete -c tasks -n '__kebab_tasks_at add' -s p -l priority -d 'Priority' -r")
+    end
+
+    it "offers each node's candidates only at exactly its path" do
+      script = Kebab::Completion::Shell::Fish.generate(CompTri.schema)
+      script.should contain("complete -c tri -n '__kebab_tri_at' -a 'mid'")
+      script.should contain("complete -c tri -n '__kebab_tri_at mid' -a 'deep'")
     end
 
     it "honours a binary-name override" do
