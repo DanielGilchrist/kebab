@@ -7,8 +7,10 @@ module Kebab
   # name and summary. Accepts `name : String` (defaults to the underscored struct name) and `summary : String`.
   annotation Command; end
 
-  # Marks a field as an option flag. Accepts `long : String`,
-  # `short : Char`, `description : String`, and `converter : Type`.
+  # Marks a field as an option. A `Bool` field is a flag. Any other type takes a
+  # value. Accepts `long : String`, `short : Char`, `description : String`,
+  # `converter : Type`, and `global : Bool` (recognised throughout the command's
+  # subtree, including after subcommands).
   annotation Option; end
 
   # Marks a field as a positional argument. Accepts `name : String`,
@@ -16,6 +18,6 @@ module Kebab
   annotation Argument; end
 
   # Marks a field as the subcommand union for a parent command. Accepts
-  # `required : Bool` (defaults to `false` — bare invocation prints help).
+  # `required : Bool` (defaults to `false`, so a bare invocation prints help).
   annotation Subcommand; end
 end

@@ -1,7 +1,7 @@
 require "./spec_helper"
 
 struct SpecDuration
-  def self.parse(input : String) : self | Kebab::Convert::Failure
+  def self.convert(input : String) : self | Kebab::Convert::Failure
     if minutes = input.to_i32?
       new(minutes)
     else
@@ -15,7 +15,7 @@ struct SpecDuration
 end
 
 module UpcaseConverter
-  def self.parse(input : String) : String | Kebab::Convert::Failure
+  def self.convert(input : String) : String | Kebab::Convert::Failure
     input.upcase
   end
 end
@@ -38,7 +38,7 @@ private struct Punch
   @[Kebab::Option(converter: UpcaseConverter)]
   getter shout : String?
 
-  @[Kebab::Option(long: "duration")]
+  @[Kebab::Option(long: "duration", converter: SpecDuration)]
   getter pause : SpecDuration?
 end
 
@@ -57,6 +57,34 @@ private struct ConvertedArg
 
   @[Kebab::Argument(converter: UpcaseConverter)]
   getter value : String
+end
+
+module CommaListConverter
+  def self.convert(input : String) : Array(String) | Kebab::Convert::Failure
+    input.split(',')
+  end
+end
+
+private struct ListOption
+  include Kebab::Parseable
+
+  @[Kebab::Option(converter: CommaListConverter)]
+  getter tags : Array(String) = [] of String
+end
+
+module ExtendSelfConverter
+  extend self
+
+  def convert(input : String) : Int32 | Kebab::Convert::Failure
+    input.to_i * 2
+  end
+end
+
+private struct ExtendSelfHaver
+  include Kebab::Parseable
+
+  @[Kebab::Option(converter: ExtendSelfConverter)]
+  getter doubled : Int32?
 end
 
 private struct RequiredOption
@@ -229,11 +257,12 @@ describe Kebab::Parseable do
   end
 
   it "errors when an option value looks like another option" do
-    error = parse_punch_error!(["--at", "-3"])
+    error = parse_punch_error!(["--at", "--verbose"])
     error.should be_a(Kebab::Error::MissingValue)
   end
 
-  it "accepts negative-looking values via the inline = form" do
+  it "accepts a negative number as an option value" do
+    parse_punch!(["--at", "-3"]).at.should eq("-3")
     parse_punch!(["--at=-3"]).at.should eq("-3")
   end
 
@@ -245,6 +274,14 @@ describe Kebab::Parseable do
 
   it "applies a converter to a positional argument" do
     ConvertedArg.parse(["hello"]).as(ConvertedArg).value.should eq("HELLO")
+  end
+
+  it "allows an Array option when a converter owns the parsing" do
+    ListOption.parse(["--tags", "a,b,c"]).as(ListOption).tags.should eq(["a", "b", "c"])
+  end
+
+  it "accepts an `extend self` converter" do
+    ExtendSelfHaver.parse(["--doubled", "21"]).as(ExtendSelfHaver).doubled.should eq(42)
   end
 
   it "converts floats" do
@@ -356,7 +393,7 @@ end
 private struct EnumHaver
   include Kebab::Parseable
 
-  @[Kebab::Option(converter: Kebab::Convert::Enum(SpecOutputFormat))]
+  @[Kebab::Option]
   getter format : SpecOutputFormat = SpecOutputFormat::Text
 end
 
@@ -365,6 +402,25 @@ private struct MultiWordEnumHaver
 
   @[Kebab::Option(converter: Kebab::Convert::Enum(SpecMultiWord))]
   getter format : SpecMultiWord = SpecMultiWord::PrettyJson
+end
+
+enum SpecCustomEnum
+  Json
+  Text
+end
+
+module AliasedEnumConverter
+  def self.convert(input : String) : SpecCustomEnum | Kebab::Convert::Failure
+    return SpecCustomEnum::Json if input == "j"
+    Kebab::Convert::Enum(SpecCustomEnum).convert(input)
+  end
+end
+
+private struct CustomEnumHaver
+  include Kebab::Parseable
+
+  @[Kebab::Option(converter: AliasedEnumConverter)]
+  getter format : SpecCustomEnum = SpecCustomEnum::Text
 end
 
 private struct VariadicRequired
@@ -392,7 +448,7 @@ private struct VariadicTyped
 end
 
 module VariadicDoubler
-  def self.parse(input : String) : Int32 | Kebab::Convert::Failure
+  def self.convert(input : String) : Int32 | Kebab::Convert::Failure
     if n = input.to_i32?
       n * 2
     else
@@ -507,7 +563,7 @@ describe "Kebab::Parseable in-command error handlers" do
   end
 end
 
-describe Kebab::Convert::Enum do
+describe "enum conversion" do
   it "parses a matching enum value (case-insensitive)" do
     EnumHaver.parse(["--format", "json"]).as(EnumHaver).format.should eq(SpecOutputFormat::Json)
     EnumHaver.parse(["--format", "YAML"]).as(EnumHaver).format.should eq(SpecOutputFormat::Yaml)
@@ -541,6 +597,15 @@ describe Kebab::Convert::Enum do
   it "lists multi-word members underscored and sorted when unrecognised" do
     error = MultiWordEnumHaver.parse(["--format", "xml"]).as(Kebab::Error::InvalidValue)
     error.reason.should eq("one of: pretty_json or raw_text")
+  end
+
+  it "gives the same result whether the converter is named explicitly or inferred" do
+    MultiWordEnumHaver.parse(["--format", "raw_text"]).as(MultiWordEnumHaver).format.should eq(SpecMultiWord::RawText)
+  end
+
+  it "customises enum conversion through an explicit converter" do
+    CustomEnumHaver.parse(["--format", "j"]).as(CustomEnumHaver).format.should eq(SpecCustomEnum::Json)
+    CustomEnumHaver.parse(["--format", "text"]).as(CustomEnumHaver).format.should eq(SpecCustomEnum::Text)
   end
 end
 
@@ -617,5 +682,28 @@ private struct SelfRunKwarg
 
   def run(log : Array(String), *, label : String) : Nil
     log << "ran:#{label}"
+  end
+end
+
+private struct DriftGuard
+  include Kebab::Parseable
+
+  @[Kebab::Option]
+  getter output_dir : String?
+
+  @[Kebab::Argument]
+  getter input_file : String?
+end
+
+# The schema, parse, and check macros each derive field names independently.
+describe "schema and parser agree on derived names" do
+  it "advertises the dashed names the parser accepts" do
+    schema = DriftGuard.schema
+    schema.options.map(&.long).should contain("output-dir")
+    schema.arguments.map(&.name).should contain("input-file")
+
+    parsed = DriftGuard.parse(["--output-dir", "build", "main.cr"]).as(DriftGuard)
+    parsed.output_dir.should eq("build")
+    parsed.input_file.should eq("main.cr")
   end
 end

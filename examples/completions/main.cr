@@ -23,7 +23,7 @@ end
 struct Completions
   include Kebab::Parseable
 
-  @[Kebab::Argument(description: "Shell", converter: Kebab::Convert::Enum(Kebab::Completion::Shell))]
+  @[Kebab::Argument(description: "Shell")]
   getter shell : Kebab::Completion::Shell
 end
 
