@@ -222,6 +222,7 @@ module Kebab
                 end
                 short_specs = option_specs.select { |spec| spec[:short] }
                 global_specs = option_specs.select { |spec| spec[:global] }
+                digit_shorts = short_specs.any? { |spec| spec[:short].stringify =~ /\d/ }
 
                 argument_specs = argument_ivars.map do |ivar|
                   argument = ivar.annotation(::Kebab::Argument)
@@ -294,6 +295,11 @@ module Kebab
               while %index < args.size
                 %raw = args[%index]
                 %token = %separated ? ::Kebab::Token::Positional.new(%raw) : ::Kebab::Token.classify(%raw)
+                {% unless digit_shorts %}
+                  if %token.is_a?(::Kebab::Token::Shorts) && %raw.matches?(/\A-\.?\d/)
+                    %token = ::Kebab::Token::Positional.new(%raw)
+                  end
+                {% end %}
 
                 case %token
                 in ::Kebab::Token::Separator
