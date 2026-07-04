@@ -12,8 +12,13 @@ module Kebab
           io << '_' << name << "() {\n"
           io << "  local cmd i\n"
           io << "  cmd=\"" << name << "\"\n"
+          valued = Completion.valued_flags(command)
           io << "  for ((i = 2; i < CURRENT; i++)); do\n"
           io << "    case \"${words[i]}\" in\n"
+          io << "      -*=*) ;;\n"
+          unless valued.empty?
+            io << "      " << valued.join('|') << ") ((i++)) ;;\n"
+          end
           io << "      -*) ;;\n"
           io << "      *) cmd=\"${cmd}__${words[i]}\" ;;\n"
           io << "    esac\n"

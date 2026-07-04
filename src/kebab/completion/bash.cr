@@ -13,8 +13,13 @@ module Kebab
           io << "  local cur cmd i\n"
           io << "  cur=\"${COMP_WORDS[COMP_CWORD]}\"\n"
           io << "  cmd=\"" << name << "\"\n"
+          valued = Completion.valued_flags(command)
           io << "  for ((i = 1; i < COMP_CWORD; i++)); do\n"
           io << "    case \"${COMP_WORDS[i]}\" in\n"
+          io << "      -*=*) ;;\n"
+          unless valued.empty?
+            io << "      " << valued.join('|') << ") ((i++)) ;;\n"
+          end
           io << "      -*) ;;\n"
           io << "      *) cmd=\"${cmd}__${COMP_WORDS[i]}\" ;;\n"
           io << "    esac\n"
