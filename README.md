@@ -84,7 +84,15 @@ A field's type sets how its value parses:
 - `String` and the number types (`Int32`, `Float64`, and the other int/float widths) are built in.
 - `Bool` is a flag, never a value.
 - Enums parse automatically. Matching is case-insensitive and treats `-` and `_` the same. An unknown value errors with the valid names.
-- `Array(T)` collects the remaining positionals, each parsed as `T`.
+- `Array(T)` makes an option repeatable: `--tag a --tag b` collects both, each parsed as `T`. As the last positional argument it collects the remaining positionals instead.
+- `Tuple(A, B)` takes a fixed group of values in one occurrence (`--range 1 10`), each position parsed as its own type. `Array(Tuple(A, B))` repeats the group, and as arguments both consume that many positionals.
+
+`arity:` sets how many values one occurrence takes. `arity: 2` on an `Array(T)`
+option consumes two per occurrence, flattened into the array. A range
+(`arity: 1..`) consumes until the next option, allowed only where nothing can
+be swallowed: commands with no positional arguments or subcommand, and never
+`global:`. `value_names:` names the placeholders in help, so
+`value_names: {"min", "max"}` renders `--range <min> <max>`.
 
 Other types need a `converter:`, a type or module with `self.convert(input : String) : T | Kebab::Convert::Failure`:
 
@@ -106,7 +114,34 @@ end
 getter pause : Duration?
 ```
 
-An unsupported type with no `converter:` is a compile error.
+Passing a scalar option twice is an error. To repeat into something other than an
+array, give the converter a `collect`: each occurrence goes through `convert`,
+then the results go through `collect` once to build the field.
+
+```crystal
+module Tags
+  def self.convert(input : String) : String | Kebab::Convert::Failure
+    input
+  end
+
+  def self.collect(values : Array(String)) : Set(String) | Kebab::Convert::Failure
+    set = values.to_set
+    return Kebab::Convert.failure("duplicate tags") if set.size != values.size
+    set
+  end
+end
+
+@[Kebab::Option(converter: Tags)]
+getter tags : Set(String) = Set(String).new
+```
+
+On an `Array(T)` field the converter may instead return `Array(T)`, yielding
+several elements from one value, so a comma-splitting converter turns
+`--tag a,b --tag c` into all three. A converter with `collect` also works on
+the last positional argument, folding the remaining positionals.
+
+A `collect` failure is a `Kebab::Error::InvalidCollection` carrying every raw
+value. An unsupported type with no `converter:` is a compile error.
 
 ## Examples
 
@@ -119,6 +154,7 @@ Runnable walkthroughs in [`examples/`](examples/):
 - [`examples/suggestions/`](examples/suggestions/): in-command error handlers with "did you mean" hints.
 - [`examples/completions/`](examples/completions/): generating fish, bash, and zsh completions.
 - [`examples/global/`](examples/global/): options usable anywhere in a command's subtree with `global: true`.
+- [`examples/collections/`](examples/collections/): repeated options, value groups, and variadic arity.
 - [`examples/testing/`](examples/testing/): testing commands with parse, injected dependencies, and captured IO.
 
 ## Global options

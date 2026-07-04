@@ -9,8 +9,9 @@ module Kebab
 
   # Marks a field as an option. A `Bool` field is a flag. Any other type takes a
   # value. Accepts `long : String`, `short : Char`, `description : String`,
-  # `converter : Type`, and `global : Bool` (recognised throughout the command's
-  # subtree, including after subcommands).
+  # `converter : Type`, `global : Bool` (recognised throughout the command's
+  # subtree, including after subcommands), `arity : Int | Range` (values per
+  # occurrence), and `value_names : Tuple` (the `<name>` placeholders in help).
   annotation Option; end
 
   # Marks a field as a positional argument. Accepts `name : String`,

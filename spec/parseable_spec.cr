@@ -59,17 +59,90 @@ private struct ConvertedArg
   getter value : String
 end
 
-module CommaListConverter
-  def self.convert(input : String) : Array(String) | Kebab::Convert::Failure
-    input.split(',')
+module StrictTagSet
+  def self.convert(input : String) : String | Kebab::Convert::Failure
+    input
+  end
+
+  def self.collect(values : Array(String)) : Set(String) | Kebab::Convert::Failure
+    set = values.to_set
+    return Kebab::Convert.failure("duplicate tags", name: "tags") if set.size != values.size
+    set
   end
 end
 
-private struct ListOption
+module SpecSetConverter(T)
+  def self.convert(input : String) : T | Kebab::Convert::Failure
+    Kebab::Convert.convert(T, input)
+  end
+
+  def self.collect(values : Array(T)) : Set(T) | Kebab::Convert::Failure
+    values.to_set
+  end
+end
+
+module SumConverter
+  def self.convert(input : String) : Int32 | Kebab::Convert::Failure
+    Kebab::Convert.convert(Int32, input)
+  end
+
+  def self.collect(values : Array(Int32)) : Int32 | Kebab::Convert::Failure
+    values.sum
+  end
+end
+
+private struct Repeater
   include Kebab::Parseable
 
-  @[Kebab::Option(converter: CommaListConverter)]
-  getter tags : Array(String) = [] of String
+  @[Kebab::Option]
+  getter tag : Array(String) = [] of String
+
+  @[Kebab::Option(short: 'n')]
+  getter num : Array(Int32) = [] of Int32
+
+  @[Kebab::Option(converter: VariadicDoubler)]
+  getter doubled : Array(Int32) = [] of Int32
+
+  @[Kebab::Option]
+  getter maybe : Array(String)?
+end
+
+private struct RequiredRepeat
+  include Kebab::Parseable
+
+  @[Kebab::Option]
+  getter tag : Array(String)
+end
+
+module ExactlyTwo
+  def self.convert(input : String) : String | Kebab::Convert::Failure
+    input
+  end
+
+  def self.collect(values : Array(String)) : Set(String) | Kebab::Convert::Failure
+    return Kebab::Convert.failure if values.size != 2
+    values.to_set
+  end
+end
+
+private struct PairHaver
+  include Kebab::Parseable
+
+  @[Kebab::Option(converter: ExactlyTwo)]
+  getter pair : Set(String) = Set(String).new
+end
+
+private struct SetHaver
+  include Kebab::Parseable
+
+  @[Kebab::Option(converter: StrictTagSet)]
+  getter tags : Set(String) = Set(String).new
+
+  @[Kebab::Option(converter: SpecSetConverter(Int32))]
+  getter ids : Set(Int32) = Set(Int32).new
+
+  @[Kebab::Option(converter: SumConverter)]
+  getter total : Int32 = 0
 end
 
 module ExtendSelfConverter
@@ -330,10 +403,6 @@ describe Kebab::Parseable do
 
   it "applies a converter to a positional argument" do
     ConvertedArg.parse(["hello"]).as(ConvertedArg).value.should eq("HELLO")
-  end
-
-  it "allows an Array option when a converter owns the parsing" do
-    ListOption.parse(["--tags", "a,b,c"]).as(ListOption).tags.should eq(["a", "b", "c"])
   end
 
   it "accepts an `extend self` converter" do
@@ -646,6 +715,243 @@ describe "Kebab::Parseable in-command error handlers" do
   end
 end
 
+module CommaSplit
+  def self.convert(input : String) : Array(String) | Kebab::Convert::Failure
+    input.split(',')
+  end
+end
+
+private struct CommaTags
+  include Kebab::Parseable
+
+  @[Kebab::Option(converter: CommaSplit)]
+  getter tag : Array(String) = [] of String
+
+  @[Kebab::Argument(converter: CommaSplit)]
+  getter extras : Array(String) = [] of String
+end
+
+private struct SetTail
+  include Kebab::Parseable
+
+  @[Kebab::Argument]
+  getter target : String
+
+  @[Kebab::Argument(converter: StrictTagSet)]
+  getter tags : Set(String) = Set(String).new
+end
+
+private struct MultiValue
+  include Kebab::Parseable
+
+  @[Kebab::Option(value_names: {"min", "max"})]
+  getter range : Tuple(Int32, Int32) = {0, 0}
+
+  @[Kebab::Option(short: 'p', arity: 2)]
+  getter pair : Array(String) = [] of String
+
+  @[Kebab::Option]
+  getter points : Array(Tuple(String, Int32)) = [] of Tuple(String, Int32)
+
+  @[Kebab::Option]
+  getter at : Tuple(Int32, Int32)?
+end
+
+private struct Greedy
+  include Kebab::Parseable
+
+  @[Kebab::Option(arity: 2.., value_names: {"file"})]
+  getter files : Array(String) = [] of String
+end
+
+private struct MoveArgs
+  include Kebab::Parseable
+
+  @[Kebab::Argument]
+  getter from : Tuple(Int32, Int32)
+
+  @[Kebab::Argument]
+  getter waypoints : Array(Tuple(Int32, Int32)) = [] of Tuple(Int32, Int32)
+end
+
+describe "multi-value options and arguments" do
+  it "parses a tuple option per position" do
+    MultiValue.parse(["--range", "1", "10"]).as(MultiValue).range.should eq({1, 10})
+  end
+
+  it "reports the failing position when a tuple value doesn't convert" do
+    error = MultiValue.parse(["--range", "1", "x"]).as(Kebab::Error::InvalidValue)
+    error.value.should eq("x")
+  end
+
+  it "keeps a nilable tuple option nil when absent" do
+    MultiValue.parse([] of String).as(MultiValue).at.should be_nil
+    MultiValue.parse(["--at", "3", "4"]).as(MultiValue).at.should eq({3, 4})
+  end
+
+  it "errors when an occurrence is short of values" do
+    error = MultiValue.parse(["--range", "1"]).as(Kebab::Error::MissingValue)
+    error.message.should eq(%(option "--range" expects 2 values, got 1.))
+  end
+
+  it "rejects inline values on multi-value options" do
+    error = MultiValue.parse(["--range=1,10"]).as(Kebab::Error::InvalidValue)
+    error.reason.should eq("takes multiple values as separate tokens, not inline")
+  end
+
+  it "repeats a tuple-grouped option into pairs" do
+    parsed = MultiValue.parse(["--points", "x", "1", "--points", "y", "2"]).as(MultiValue)
+    parsed.points.should eq([{"x", 1}, {"y", 2}])
+  end
+
+  it "flattens fixed-arity occurrences into the array" do
+    MultiValue.parse(["-p", "a", "b", "-p", "c", "d"]).as(MultiValue).pair.should eq(["a", "b", "c", "d"])
+  end
+
+  it "consumes greedily up to the arity minimum with a range" do
+    Greedy.parse(["--files", "a", "b", "c"]).as(Greedy).files.should eq(["a", "b", "c"])
+    error = Greedy.parse(["--files", "a"]).as(Kebab::Error::MissingValue)
+    error.message.should eq(%(option "--files" expects at least 2 values, got 1.))
+  end
+
+  it "renders value names and variable tails in help" do
+    range_help = MultiValue.parse(["--help"]).as(Kebab::Help).text
+    range_help.should contain("--range <min> <max>")
+    Greedy.parse(["--help"]).as(Kebab::Help).text.should contain("--files <file>...")
+  end
+
+  it "binds tuple arguments and grouped variadic tails" do
+    parsed = MoveArgs.parse(["1", "2", "3", "4", "5", "6"]).as(MoveArgs)
+    parsed.from.should eq({1, 2})
+    parsed.waypoints.should eq([{3, 4}, {5, 6}])
+  end
+
+  it "errors on a token that dangles off a grouped tail" do
+    error = MoveArgs.parse(["1", "2", "3"]).as(Kebab::Error::UnexpectedArgument)
+    error.value.should eq("3")
+  end
+
+  it "errors when a tuple argument is partially supplied" do
+    MoveArgs.parse(["1"]).should be_a(Kebab::Error::MissingArgument)
+  end
+
+  it "advertises tuple argument slots in the usage line" do
+    MoveArgs.schema.usage.to_s.should contain("<from> <from> <waypoints> <waypoints>...")
+  end
+end
+
+describe "whole-collection converters" do
+  it "flattens several elements per occurrence into the array" do
+    CommaTags.parse(["--tag", "a,b", "--tag", "c"]).as(CommaTags).tag.should eq(["a", "b", "c"])
+  end
+
+  it "splits inline values the same way" do
+    CommaTags.parse(["--tag=a,b"]).as(CommaTags).tag.should eq(["a", "b"])
+  end
+
+  it "splits each variadic positional" do
+    CommaTags.parse(["x,y", "z"]).as(CommaTags).extras.should eq(["x", "y", "z"])
+  end
+end
+
+describe "collect arguments" do
+  it "folds the remaining positionals into the field type" do
+    parsed = SetTail.parse(["build", "a", "b"]).as(SetTail)
+    parsed.target.should eq("build")
+    parsed.tags.should eq(Set{"a", "b"})
+  end
+
+  it "returns InvalidCollection naming the argument when collect rejects" do
+    error = SetTail.parse(["build", "a", "a"]).as(Kebab::Error::InvalidCollection)
+    error.values.should eq(["a", "a"])
+    error.message.should eq(%("a", "a" aren't valid tags for "<tags>" (duplicate tags)))
+  end
+
+  it "uses the default when no positionals remain" do
+    SetTail.parse(["build"]).as(SetTail).tags.should be_empty
+  end
+
+  it "renders the collect tail as variadic in usage" do
+    SetTail.schema.usage.to_s.should contain("<target> <tags>...")
+  end
+end
+
+describe "repeatable options" do
+  it "accumulates values in the order they were given" do
+    Repeater.parse(["--tag", "a", "--tag", "b", "--tag", "c"]).as(Repeater).tag.should eq(["a", "b", "c"])
+  end
+
+  it "accepts a single occurrence" do
+    Repeater.parse(["--tag", "a"]).as(Repeater).tag.should eq(["a"])
+  end
+
+  it "converts each occurrence via the element type" do
+    Repeater.parse(["-n", "1", "-n", "2"]).as(Repeater).num.should eq([1, 2])
+  end
+
+  it "accepts inline values" do
+    Repeater.parse(["--tag=a", "--tag=b"]).as(Repeater).tag.should eq(["a", "b"])
+  end
+
+  it "applies a converter to each occurrence" do
+    Repeater.parse(["--doubled", "2", "--doubled", "3"]).as(Repeater).doubled.should eq([4, 6])
+  end
+
+  it "reports the failing occurrence when an element doesn't convert" do
+    error = Repeater.parse(["-n", "1", "-n", "potato"]).as(Kebab::Error::InvalidValue)
+    error.value.should eq("potato")
+  end
+
+  it "uses the default when never given" do
+    Repeater.parse([] of String).as(Repeater).num.should eq([] of Int32)
+  end
+
+  it "is nil when nilable and never given" do
+    Repeater.parse([] of String).as(Repeater).maybe.should be_nil
+    Repeater.parse(["--maybe", "x"]).as(Repeater).maybe.should eq(["x"])
+  end
+
+  it "errors when required and never given" do
+    RequiredRepeat.parse([] of String).should be_a(Kebab::Error::MissingOption)
+  end
+
+  it "collects into the field type via the converter's collect" do
+    SetHaver.parse(["--tags", "a", "--tags", "b"]).as(SetHaver).tags.should eq(Set{"a", "b"})
+  end
+
+  it "phrases a single-value collect failure in the singular" do
+    error = PairHaver.parse(["--pair", "a"]).as(Kebab::Error::InvalidCollection)
+    error.message.should eq(%("a" isn't a valid value for "--pair"))
+  end
+
+  it "falls back to a friendly noun when the converter gives no name" do
+    error = PairHaver.parse(["--pair", "a", "--pair", "b", "--pair", "c"]).as(Kebab::Error::InvalidCollection)
+    error.message.should eq(%("a", "b", "c" aren't valid values for "--pair"))
+  end
+
+  it "returns InvalidCollection when collect rejects the values" do
+    error = SetHaver.parse(["--tags", "a", "--tags", "b", "--tags", "a"]).as(Kebab::Error::InvalidCollection)
+    error.values.should eq(["a", "b", "a"])
+    error.source.as(Kebab::Schema::Option).long.should eq("tags")
+    error.reason.should eq("duplicate tags")
+    error.message.should eq(%("a", "b", "a" aren't valid tags for "--tags" (duplicate tags)))
+  end
+
+  it "narrows InvalidCollection by target type and command" do
+    error = SetHaver.parse(["--tags", "a", "--tags", "a"])
+    error.should be_a(Kebab::Error::InvalidCollection::Of(Set(String)))
+    error.should be_a(Kebab::Error::InvalidCollection::For(SetHaver))
+  end
+
+  it "collects through a generic converter" do
+    SetHaver.parse(["--ids", "1", "--ids", "2", "--ids", "1"]).as(SetHaver).ids.should eq(Set{1, 2})
+  end
+
+  it "folds into a scalar when collect returns one" do
+    SetHaver.parse(["--total", "1", "--total", "2", "--total", "3"]).as(SetHaver).total.should eq(6)
+  end
+end
+
 describe "enum conversion" do
   it "parses a matching enum value (case-insensitive)" do
     EnumHaver.parse(["--format", "json"]).as(EnumHaver).format.should eq(SpecOutputFormat::Json)
@@ -788,5 +1094,16 @@ describe "schema and parser agree on derived names" do
     parsed = DriftGuard.parse(["--output-dir", "build", "main.cr"]).as(DriftGuard)
     parsed.output_dir.should eq("build")
     parsed.input_file.should eq("main.cr")
+  end
+
+  it "advertises the same arity the parser enforces" do
+    range = MultiValue.schema.options.find! { |option| option.long == "range" }
+    range.min_values.should eq(2)
+    range.max_values.should eq(2)
+    range.value_names.should eq(["min", "max"])
+
+    files = Greedy.schema.options.find! { |option| option.long == "files" }
+    files.min_values.should eq(2)
+    files.max_values.should be_nil
   end
 end

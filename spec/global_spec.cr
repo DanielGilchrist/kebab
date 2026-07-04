@@ -56,6 +56,26 @@ struct GlobalSpecCluster
   getter command : GlobalSpecGo
 end
 
+struct GlobalSpecRepeat
+  include Kebab::Parseable
+
+  @[Kebab::Option(global: true)]
+  getter tag : Array(String) = [] of String
+
+  @[Kebab::Subcommand]
+  getter command : GlobalSpecWeek
+end
+
+struct GlobalSpecPair
+  include Kebab::Parseable
+
+  @[Kebab::Option(global: true)]
+  getter range : Tuple(Int32, Int32) = {0, 0}
+
+  @[Kebab::Subcommand]
+  getter command : GlobalSpecWeek
+end
+
 private def parse_root!(args : Array(String)) : GlobalSpecRoot
   GlobalSpecRoot.parse(args).as(GlobalSpecRoot)
 end
@@ -71,6 +91,24 @@ describe "Kebab::Parseable global options" do
     root = parse_root!(["week", "--no-colour"])
     root.no_colour?.should be_true
     root.command.should be_a(GlobalSpecWeek)
+  end
+
+  it "collects a repeatable global across the subcommand boundary" do
+    root = GlobalSpecRepeat.parse(["--tag", "a", "week", "--tag", "b"]).as(GlobalSpecRepeat)
+    root.tag.should eq(["a", "b"])
+    root.command.should be_a(GlobalSpecWeek)
+  end
+
+  it "hoists every value of a fixed-arity global" do
+    root = GlobalSpecPair.parse(["week", "--range", "1", "2"]).as(GlobalSpecPair)
+    root.range.should eq({1, 2})
+    error = GlobalSpecPair.parse(["week", "--range", "1"]).as(Kebab::Error::MissingValue)
+    error.message.should eq(%(option "--range" expects 2 values, got 1.))
+  end
+
+  it "doesn't dispatch subcommands after --" do
+    error = GlobalSpecRepeat.parse(["--", "week"]).as(Kebab::Error::UnexpectedArgument)
+    error.value.should eq("week")
   end
 
   it "accepts a global value option after the subcommand" do

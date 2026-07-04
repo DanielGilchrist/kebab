@@ -2,7 +2,7 @@ module Kebab
   module Parseable
     macro __kebab_validate_schema
       {%
-        allowed_option_keys = ["short", "long", "description", "converter", "global"]
+        allowed_option_keys = ["short", "long", "description", "converter", "global", "arity", "value_names"]
         allowed_argument_keys = ["name", "description", "converter"]
         allowed_subcommand_keys = ["required"]
         allowed_command_keys = ["name", "summary"]
@@ -78,8 +78,15 @@ module Kebab
             end
             base = argument_bases.first
             element = base.name(generic_args: false).stringify == "Array" ? base.type_vars.first : base
-            if element == Bool
+            element_types = element <= ::Tuple ? element.type_vars : [element]
+            if element_types.any? { |element_type| element_type == Bool }
               raise "@[Kebab::Argument] '#{ivar.name}' has a Bool value type. Bool fields can't be positional. Use @[Kebab::Option] for flags."
+            end
+            if element <= ::Tuple && element.type_vars.size < 2
+              raise "@[Kebab::Argument] '#{ivar.name}' has type `#{element}`. A one-value tuple is a plain value. Use `#{element.type_vars.first}` directly."
+            end
+            if element_types.any? { |element_type| element_type <= ::Tuple || element_type.name(generic_args: false).stringify == "Array" }
+              raise "Field '#{ivar.name}' on #{@type} has type `#{base}`. Tuple values must be simple types. Nested tuples and arrays can't parse from the command line."
             end
             if base.name(generic_args: false).stringify == "Array" && ivar.type.nilable?
               raise "Variadic argument '#{ivar.name}' on #{@type} can't be nilable. Use `Array(T)` (and default to `[] of T` for optional)."
@@ -118,8 +125,60 @@ module Kebab
             if bases.first == Bool && option[:converter]
               raise "@[Kebab::Option] '#{ivar.name}' is a Bool flag and never converts a value. Remove the `converter:`."
             end
-            if bases.first.name(generic_args: false).stringify == "Array" && !option[:converter]
-              raise "@[Kebab::Option] '#{ivar.name}' has type `#{bases.first}`. Array(T) is only supported as the trailing positional @[Kebab::Argument], or with a `converter:`."
+            option_base = bases.first
+            option_array = option_base.name(generic_args: false).stringify == "Array"
+            option_occurrence = option_array ? option_base.type_vars.first : option_base
+            option_tuple = option_occurrence <= ::Tuple
+            option_value_types = option_tuple ? option_occurrence.type_vars : [option_occurrence]
+            if option_base != Bool && option_value_types.any? { |value_type| value_type == Bool }
+              raise "@[Kebab::Option] '#{ivar.name}' has type `#{option_base}`. A flag can't take a value, so it can't be one of several. Use a plain `Bool`."
+            end
+            if option_tuple && option_occurrence.type_vars.size < 2
+              raise "@[Kebab::Option] '#{ivar.name}' has type `#{option_occurrence}`. A one-value tuple is a plain value. Use `#{option_occurrence.type_vars.first}` directly."
+            end
+            if option_value_types.any? { |value_type| value_type <= ::Tuple || value_type.name(generic_args: false).stringify == "Array" }
+              raise "Field '#{ivar.name}' on #{@type} has type `#{option_base}`. Tuple values must be simple types. Nested tuples and arrays can't parse from the command line."
+            end
+            if arity = option[:arity]
+              arity_bounds = arity.is_a?(RangeLiteral) ? [arity.begin, arity.end] : [arity]
+              integral = arity_bounds.all? { |bound| bound.is_a?(Nop) || (bound.is_a?(NumberLiteral) && bound.kind != :f32 && bound.kind != :f64) }
+              unless (arity.is_a?(NumberLiteral) || arity.is_a?(RangeLiteral)) && integral
+                raise "@[Kebab::Option(arity:)] on '#{ivar.name}' must be an Int like `2` or an inclusive Range like `1..` or `2..4`, got `#{arity}`."
+              end
+              if option_base == Bool
+                raise "@[Kebab::Option(arity:)] on '#{ivar.name}': a Bool flag takes no values. Remove the `arity:`."
+              end
+              if option_tuple
+                raise "@[Kebab::Option(arity:)] on '#{ivar.name}': the tuple type `#{option_occurrence}` already fixes the arity at #{option_occurrence.type_vars.size}. Remove the `arity:`."
+              end
+              unless option_array
+                raise "@[Kebab::Option(arity:)] on '#{ivar.name}': `#{option_base}` takes one value. Use `Tuple(...)` for a fixed group of values, or `Array(T)` for a collection."
+              end
+              if arity.is_a?(RangeLiteral)
+                if arity.excludes_end?
+                  raise "@[Kebab::Option(arity:)] on '#{ivar.name}' must be an inclusive Range (`#{arity.begin}..#{arity.end}`), got `#{arity}`."
+                end
+                if arity.begin.is_a?(Nop) || arity.begin < 1
+                  raise "@[Kebab::Option(arity:)] on '#{ivar.name}': an occurrence must take at least one value, and `#{arity}` allows zero. Start the range at 1 or more."
+                end
+                if !arity.end.is_a?(Nop) && arity.end < arity.begin
+                  raise "@[Kebab::Option(arity:)] on '#{ivar.name}': `#{arity}` is empty."
+                end
+                if option[:global]
+                  raise "@[Kebab::Option] '#{ivar.name}' is global with a variable arity. A greedy global would swallow subcommands. Use a fixed arity or a repeatable option."
+                end
+              elsif arity < 1
+                raise "@[Kebab::Option(arity:)] on '#{ivar.name}': an occurrence must take at least one value, got `#{arity}`."
+              end
+            end
+            if names = option[:value_names]
+              names_literal = (names.is_a?(TupleLiteral) || names.is_a?(ArrayLiteral)) && names.size > 0 && names.all? { |name| name.is_a?(StringLiteral) }
+              unless names_literal
+                raise "@[Kebab::Option(value_names:)] on '#{ivar.name}' must be a tuple of Strings like `{\"min\", \"max\"}`, got `#{names}`."
+              end
+              if option_base == Bool
+                raise "@[Kebab::Option(value_names:)] on '#{ivar.name}': a Bool flag takes no values. Remove the `value_names:`."
+              end
             end
             seen_options << ivar
           end
@@ -128,13 +187,41 @@ module Kebab
         option_specs = seen_options.map do |ivar|
           option = ivar.annotation(::Kebab::Option)
           bases = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil } : [ivar.type]
+          base = bases.first
+          array = base.name(generic_args: false).stringify == "Array"
+          occurrence = array ? base.type_vars.first : base
+          tuple = occurrence <= ::Tuple
+          arity = option && option[:arity]
+          min_values = 0
+          max_values = 0
+          if base != Bool
+            if tuple
+              min_values = occurrence.type_vars.size
+              max_values = occurrence.type_vars.size
+            elsif arity.is_a?(RangeLiteral)
+              min_values = arity.begin
+              max_values = arity.end.is_a?(Nop) ? nil : arity.end
+            elsif arity
+              min_values = arity
+              max_values = arity
+            else
+              min_values = 1
+              max_values = 1
+            end
+          end
           {
-            name:         ivar.name.stringify,
-            long:         (option && option[:long]) || ivar.name.stringify.gsub(/_/, "-"),
-            short:        option && option[:short],
-            converter:    option && option[:converter],
-            global:       option && option[:global],
-            convert_type: bases.first,
+            name:          ivar.name.stringify,
+            long:          (option && option[:long]) || ivar.name.stringify.gsub(/_/, "-"),
+            short:         option && option[:short],
+            converter:     option && option[:converter],
+            global:        option && option[:global],
+            names:         option && option[:value_names],
+            field_type:    base,
+            array:         array,
+            tuple:         tuple,
+            min_values:    min_values,
+            max_values:    max_values,
+            convert_types: tuple ? occurrence.type_vars : [occurrence],
           }
         end
         argument_specs = seen_arguments.map do |ivar|
@@ -142,25 +229,67 @@ module Kebab
           bases = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil } : [ivar.type]
           base = bases.first
           variadic = base.name(generic_args: false).stringify == "Array"
+          inner = variadic ? base.type_vars.first : base
+          tuple = inner <= ::Tuple
+          converter = argument && argument[:converter]
+          collects = converter && (converter.is_a?(Path) || converter.is_a?(Generic) || converter.is_a?(TypeNode)) &&
+                     (converter.resolve.class.methods + converter.resolve.methods).any? { |method| method.name.stringify == "collect" }
           {
-            ivar:         ivar,
-            name:         ivar.name.stringify,
-            arg_name:     (argument && argument[:name]) || ivar.name.stringify.gsub(/_/, "-"),
-            converter:    argument && argument[:converter],
-            variadic:     variadic,
-            convert_type: variadic ? base.type_vars.first : base,
+            ivar:          ivar,
+            name:          ivar.name.stringify,
+            arg_name:      (argument && argument[:name]) || ivar.name.stringify.gsub(/_/, "-"),
+            converter:     converter,
+            variadic:      variadic,
+            collects:      collects,
+            field_type:    base,
+            tuple:         tuple,
+            convert_types: tuple ? inner.type_vars : [inner],
           }
+        end
+
+        option_specs.each do |spec|
+          if names = spec[:names]
+            expected = spec[:max_values] != spec[:min_values] ? 1 : spec[:min_values]
+            if names.size != expected
+              if spec[:max_values] != spec[:min_values]
+                raise "@[Kebab::Option(value_names:)] on '#{spec[:name].id}': a variable-arity option gets one name (rendered `<#{names.first}>...`), got #{names.size}."
+              else
+                raise "@[Kebab::Option(value_names:)] on '#{spec[:name].id}' names #{names.size} values, but --#{spec[:long].id} takes #{expected}."
+              end
+            end
+          end
+          if spec[:max_values] != spec[:min_values]
+            unless seen_arguments.empty?
+              raise "Field '#{spec[:name].id}' on #{@type} has a variable arity, but #{@type} also declares positional arguments. " \
+                    "A greedy option would swallow them. Use a fixed arity or a repeatable option."
+            end
+            unless seen_subcommands.empty?
+              raise "Field '#{spec[:name].id}' on #{@type} has a variable arity, but #{@type} dispatches to a subcommand. " \
+                    "A greedy option would swallow the subcommand name. Use a fixed arity or a repeatable option."
+            end
+          end
         end
 
         # Bool only reaches here as a flag option. Bool positionals were rejected above.
         convertible_numbers = ::Kebab::Convert::NUMBER_SUFFIXES.keys.map(&.resolve)
 
         (option_specs + argument_specs).each do |spec|
-          type = spec[:convert_type]
           if converter = spec[:converter]
-            signature = "`self.convert(input : String) : #{type} | Kebab::Convert::Failure`"
-            # `extend self` puts `convert` on the instance side, so check both.
+            if spec[:tuple] && spec[:convert_types].uniq.size != 1
+              raise "Field '#{spec[:name].id}' on #{@type}: a converter converts every value the same way, but `#{spec[:field_type]}` mixes types. " \
+                    "Drop the `converter:` (each position converts on its own), or make the tuple homogeneous."
+            end
+            type = spec[:convert_types].first
+            # `extend self` puts methods on the instance side, so check both.
             convert_defs = converter.resolve.class.methods + converter.resolve.methods
+            collect_method = convert_defs.find { |method| method.name.stringify == "collect" }
+            if collect_method && spec[:tuple]
+              raise "Field '#{spec[:name].id}' on #{@type}: `collect` folds one value per occurrence, but `#{spec[:field_type]}` groups values into tuples. " \
+                    "Use `Array(#{spec[:convert_types].first})`-style fields with `collect`, or drop it."
+            end
+
+            element_label = collect_method ? "<element>".id : type
+            signature = "`self.convert(input : String) : #{element_label} | Kebab::Convert::Failure`"
             convert_method = convert_defs.find { |method| method.name.stringify == "convert" && method.args.size == 1 }
             unless convert_method
               if convert_defs.any? { |method| method.name.stringify == "convert" }
@@ -172,23 +301,79 @@ module Kebab
 
             # Resolving fails for a generic converter's type var and for a `self` return,
             # so those pass unchecked. The call site's type check enforces the rest.
+            convert_return = convert_method.return_type
+            element = nil
+            unless converter.is_a?(Generic) || convert_return.is_a?(Nop)
+              element_parts = (convert_return.is_a?(Union) ? convert_return.types : [convert_return]).reject { |part| !part.is_a?(Self) && part.resolve == ::Kebab::Convert::Failure }
+              element = element_parts.first if element_parts.size == 1 && !element_parts.first.is_a?(Self)
+            end
+
             unless converter.is_a?(Generic)
               arg_restriction = convert_method.args.first.restriction
               if !arg_restriction.is_a?(Nop) && arg_restriction.resolve != String
                 raise "Field '#{spec[:name].id}' on #{@type}: converter #{converter}'s `convert` must take `String`, not `#{arg_restriction}`. Expected #{signature.id}."
               end
+            end
 
-              return_type = convert_method.return_type
-              unless return_type.is_a?(Nop)
-                parts = return_type.is_a?(Union) ? return_type.types : [return_type]
+            if collect_method
+              # Repeatable via `collect`: `convert` parses each occurrence,
+              # `collect` folds every converted occurrence into the field.
+              collect_signature = "`self.collect(values : Array(#{element || "<element>".id})) : #{spec[:field_type]} | Kebab::Convert::Failure`"
+              if collect_method.args.size != 1
+                raise "Field '#{spec[:name].id}' on #{@type}: converter #{converter}'s `collect` must take a single argument. Expected #{collect_signature.id}."
+              end
+              unless converter.is_a?(Generic)
+                collect_arg = collect_method.args.first.restriction
+                unless collect_arg.is_a?(Nop)
+                  resolved_arg = collect_arg.resolve
+                  arg_is_array = resolved_arg.name(generic_args: false).stringify == "Array"
+                  unless arg_is_array && (element.nil? || resolved_arg.type_vars.first == element.resolve)
+                    raise "Field '#{spec[:name].id}' on #{@type}: converter #{converter}'s `collect` must take the values `convert` produces. Expected #{collect_signature.id}, got `#{collect_arg}`."
+                  end
+                end
+                collect_return = collect_method.return_type
+                unless collect_return.is_a?(Nop)
+                  collect_parts = collect_return.is_a?(Union) ? collect_return.types : [collect_return]
+                  unless collect_parts.all? { |part| part.is_a?(Self) || part.resolve == ::Kebab::Convert::Failure || part.resolve <= spec[:field_type] }
+                    raise "Field '#{spec[:name].id}' on #{@type}: converter #{converter}'s `collect` must return `#{spec[:field_type]} | Kebab::Convert::Failure`, not `#{collect_return}`."
+                  end
+                end
+              end
+            else
+              unless converter.is_a?(Generic) || convert_return.is_a?(Nop)
+                parts = convert_return.is_a?(Union) ? convert_return.types : [convert_return]
                 unless parts.all? { |part| part.is_a?(Self) || part.resolve == ::Kebab::Convert::Failure || part.resolve <= type }
-                  raise "Field '#{spec[:name].id}' on #{@type}: converter #{converter}'s `convert` must return `#{type} | Kebab::Convert::Failure`, not `#{return_type}`."
+                  # An Array field's converter may also produce several elements
+                  # from one value (like splitting on commas).
+                  whole = (spec[:array] || spec[:variadic]) && !spec[:tuple] &&
+                          parts.all? { |part| part.is_a?(Self) || part.resolve == ::Kebab::Convert::Failure || (part.resolve.name(generic_args: false).stringify == "Array" && part.resolve.type_vars.first <= type) }
+                  unless whole
+                    if spec[:tuple]
+                      raise "Field '#{spec[:name].id}' on #{@type}: `#{spec[:field_type]}` converts each value on its own, " \
+                            "so converter #{converter}'s `convert` must return `#{type} | Kebab::Convert::Failure`, not `#{convert_return}`."
+                    elsif spec[:array] || spec[:variadic]
+                      raise "Field '#{spec[:name].id}' on #{@type}: converter #{converter}'s `convert` must return " \
+                            "`#{type} | Kebab::Convert::Failure` (one element per value) or `Array(#{type}) | Kebab::Convert::Failure` (several), not `#{convert_return}`."
+                    elsif spec[:long]
+                      raise "Field '#{spec[:name].id}' on #{@type} has type `#{spec[:field_type]}`, but converter #{converter}'s `convert` returns `#{convert_return}`. " \
+                            "Either return `#{spec[:field_type]} | Kebab::Convert::Failure` (one occurrence, parsed whole), or add " \
+                            "`self.collect(values : Array(#{element || "<element>".id})) : #{spec[:field_type]} | Kebab::Convert::Failure` to make the option repeatable."
+                    else
+                      raise "Field '#{spec[:name].id}' on #{@type}: converter #{converter}'s `convert` must return `#{type} | Kebab::Convert::Failure`, not `#{convert_return}`."
+                    end
+                  end
                 end
               end
             end
-          elsif !(type == Bool || type == String || convertible_numbers.includes?(type) || type.resolve.ancestors.includes?(::Enum))
-            raise "Field '#{spec[:name].id}' on #{@type} has type `#{type}`, which kebab can't convert. " \
-                  "Add a `converter:` (see Kebab::Convert), or use a built-in type (String, a number, or an enum)."
+          elsif bad = spec[:convert_types].find { |value_type| !(value_type == Bool || value_type == String || convertible_numbers.includes?(value_type) || value_type.resolve.ancestors.includes?(::Enum)) }
+            if spec[:long] && !spec[:array] && !spec[:tuple]
+              raise "Field '#{spec[:name].id}' on #{@type} has type `#{bad}`, which kebab can't convert. " \
+                    "Use `Array(T)` for a repeatable option, add a `converter:` (one whose `collect` builds a `#{bad}` makes the option repeatable, see Kebab::Convert), " \
+                    "or use a built-in type (String, a number, or an enum)."
+            else
+              raise "Field '#{spec[:name].id}' on #{@type} has type `#{bad}`, which kebab can't convert. " \
+                    "Add a `converter:` (see Kebab::Convert), or use a built-in type (String, a number, or an enum)."
+            end
           end
         end
 
@@ -241,12 +426,12 @@ module Kebab
           argument_names[spec[:arg_name]] = spec[:name]
         end
 
-        variadic_specs = argument_specs.select { |spec| spec[:variadic] }
-        if variadic_specs.size > 1
-          raise "#{@type} has #{variadic_specs.size} variadic Array(T) arguments. Only one is allowed."
+        tail_specs = argument_specs.select { |spec| spec[:variadic] || spec[:collects] }
+        if tail_specs.size > 1
+          raise "#{@type} has #{tail_specs.size} arguments that consume the remaining positionals (variadic `Array(T)` or a converter with `collect`). Only one is allowed."
         end
-        if variadic_specs.size == 1 && variadic_specs.first[:ivar] != seen_arguments.last
-          raise "Variadic Array(T) argument '#{variadic_specs.first[:name].id}' on #{@type} must be the last positional argument."
+        if tail_specs.size == 1 && tail_specs.first[:ivar] != seen_arguments.last
+          raise "Argument '#{tail_specs.first[:name].id}' on #{@type} consumes the remaining positionals, so it must be the last one."
         end
 
         seen_optional_argument = false

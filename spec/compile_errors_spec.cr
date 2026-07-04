@@ -88,8 +88,8 @@ describe "compile-time rejections", tags: "compile" do
       CR
   end
 
-  it "rejects a converter whose convert returns the wrong type" do
-    assert_compile_time_error "must return `String | Kebab::Convert::Failure`, not", <<-CR
+  it "rejects a scalar option converter with the wrong return, naming both fixes" do
+    assert_compile_time_error "Either return `String | Kebab::Convert::Failure` (one occurrence, parsed whole), or add `self.collect(values : Array(Int32)) : String | Kebab::Convert::Failure`", <<-CR
       require "../src/kebab"
       module Conv
         def self.convert(input : String) : Int32 | Kebab::Convert::Failure
@@ -122,13 +122,141 @@ describe "compile-time rejections", tags: "compile" do
       CR
   end
 
-  it "rejects an Array option without a converter" do
-    assert_compile_time_error "Array(T) is only supported as the trailing positional", <<-CR
+  it "rejects an argument converter whose convert returns the wrong type" do
+    assert_compile_time_error "must return `String | Kebab::Convert::Failure`, not", <<-CR
+      require "../src/kebab"
+      module Conv
+        def self.convert(input : String) : Int32 | Kebab::Convert::Failure
+          5
+        end
+      end
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Argument(converter: Conv)]
+        getter x : String
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects an Array(Bool) option" do
+    assert_compile_time_error "A flag can't take a value, so it can't be one of several", <<-CR
       require "../src/kebab"
       struct C
         include Kebab::Parseable
         @[Kebab::Option]
-        getter tags : Array(String)?
+        getter flags : Array(Bool) = [] of Bool
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects an array option converter with mismatched element types" do
+    assert_compile_time_error "must return `String | Kebab::Convert::Failure` (one element per value) or `Array(String) | Kebab::Convert::Failure` (several)", <<-CR
+      require "../src/kebab"
+      module Wrong
+        def self.convert(input : String) : Array(Int32) | Kebab::Convert::Failure
+          [input.size]
+        end
+      end
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(converter: Wrong)]
+        getter tags : Array(String) = [] of String
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a collection field without a converter, naming the repeatable paths" do
+    assert_compile_time_error "Use `Array(T)` for a repeatable option", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option]
+        getter tags : Set(String) = Set(String).new
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a collect argument that isn't last" do
+    assert_compile_time_error "consumes the remaining positionals, so it must be the last one", <<-CR
+      require "../src/kebab"
+      module Tags
+        def self.convert(input : String) : String | Kebab::Convert::Failure
+          input
+        end
+        def self.collect(values : Array(String)) : Set(String) | Kebab::Convert::Failure
+          values.to_set
+        end
+      end
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Argument(converter: Tags)]
+        getter tags : Set(String) = Set(String).new
+        @[Kebab::Argument]
+        getter target : String
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a collect that takes the wrong number of arguments" do
+    assert_compile_time_error "`collect` must take a single argument", <<-CR
+      require "../src/kebab"
+      module Tags
+        def self.convert(input : String) : String | Kebab::Convert::Failure
+          input
+        end
+        def self.collect(values : Array(String), strict : Bool) : Set(String) | Kebab::Convert::Failure
+          values.to_set
+        end
+      end
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(converter: Tags)]
+        getter tags : Set(String) = Set(String).new
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a collect whose argument doesn't match convert's output" do
+    assert_compile_time_error "`collect` must take the values `convert` produces", <<-CR
+      require "../src/kebab"
+      module Tags
+        def self.convert(input : String) : String | Kebab::Convert::Failure
+          input
+        end
+        def self.collect(values : Array(Int32)) : Set(String) | Kebab::Convert::Failure
+          Set(String).new
+        end
+      end
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(converter: Tags)]
+        getter tags : Set(String) = Set(String).new
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a collect whose return doesn't match the field type" do
+    assert_compile_time_error "`collect` must return `Set(String) | Kebab::Convert::Failure`, not", <<-CR
+      require "../src/kebab"
+      module Tags
+        def self.convert(input : String) : String | Kebab::Convert::Failure
+          input
+        end
+        def self.collect(values : Array(String)) : Array(String) | Kebab::Convert::Failure
+          values
+        end
+      end
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(converter: Tags)]
+        getter tags : Set(String) = Set(String).new
       end
       C.parse([] of String)
       CR
@@ -239,7 +367,7 @@ describe "compile-time rejections", tags: "compile" do
   end
 
   it "rejects two variadic arguments" do
-    assert_compile_time_error "variadic Array(T) arguments. Only one is allowed", <<-CR
+    assert_compile_time_error "arguments that consume the remaining positionals (variadic `Array(T)` or a converter with `collect`). Only one is allowed", <<-CR
       require "../src/kebab"
       struct C
         include Kebab::Parseable
@@ -253,7 +381,7 @@ describe "compile-time rejections", tags: "compile" do
   end
 
   it "rejects a variadic argument that isn't last" do
-    assert_compile_time_error "must be the last positional", <<-CR
+    assert_compile_time_error "consumes the remaining positionals, so it must be the last one", <<-CR
       require "../src/kebab"
       struct C
         include Kebab::Parseable
@@ -497,6 +625,219 @@ describe "compile-time rejections", tags: "compile" do
         getter? verbose : Bool = false
         @[Kebab::Subcommand]
         getter cmd : Leaf
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects arity on a Tuple option" do
+    assert_compile_time_error "already fixes the arity at 2", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(arity: 2)]
+        getter range : Tuple(Int32, Int32) = {0, 0}
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects arity on a single-value option" do
+    assert_compile_time_error "takes one value. Use `Tuple(...)` for a fixed group", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(arity: 2)]
+        getter name : String?
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects arity on a flag" do
+    assert_compile_time_error "a Bool flag takes no values", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(arity: 2)]
+        getter? loud : Bool = false
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a zero arity" do
+    assert_compile_time_error "must take at least one value, got `0`", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(arity: 0)]
+        getter tags : Array(String) = [] of String
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a beginless arity range" do
+    assert_compile_time_error "allows zero. Start the range at 1", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(arity: ..3)]
+        getter tags : Array(String) = [] of String
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a float arity" do
+    assert_compile_time_error "must be an Int like `2` or an inclusive Range", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(arity: 2.5)]
+        getter tags : Array(String) = [] of String
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a zero-starting arity range" do
+    assert_compile_time_error "allows zero. Start the range at 1", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(arity: 0..)]
+        getter tags : Array(String) = [] of String
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects an exclusive arity range" do
+    assert_compile_time_error "must be an inclusive Range", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(arity: 1...3)]
+        getter tags : Array(String) = [] of String
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a variable arity alongside positional arguments" do
+    assert_compile_time_error "A greedy option would swallow them", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(arity: 1..)]
+        getter files : Array(String) = [] of String
+        @[Kebab::Argument]
+        getter target : String
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a variable arity alongside a subcommand" do
+    assert_compile_time_error "would swallow the subcommand name", <<-CR
+      require "../src/kebab"
+      @[Kebab::Command(name: "leaf")]
+      struct Leaf
+        include Kebab::Parseable
+      end
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(arity: 1..)]
+        getter files : Array(String) = [] of String
+        @[Kebab::Subcommand]
+        getter cmd : Leaf
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a variable-arity global" do
+    assert_compile_time_error "A greedy global would swallow subcommands", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(arity: 1.., global: true)]
+        getter files : Array(String) = [] of String
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects value_names that don't match the value count" do
+    assert_compile_time_error "names 3 values, but --range takes 2", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(value_names: {"a", "b", "c"})]
+        getter range : Tuple(Int32, Int32) = {0, 0}
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a one-value tuple" do
+    assert_compile_time_error "A one-value tuple is a plain value. Use `Int32` directly", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option]
+        getter solo : Tuple(Int32) = {0}
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects nested tuples" do
+    assert_compile_time_error "Tuple values must be simple types", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option]
+        getter deep : Tuple(Int32, Tuple(Int32, Int32))?
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a converter on a heterogeneous tuple" do
+    assert_compile_time_error "mixes types. Drop the `converter:`", <<-CR
+      require "../src/kebab"
+      module Conv
+        def self.convert(input : String) : String | Kebab::Convert::Failure
+          input
+        end
+      end
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(converter: Conv)]
+        getter pair : Tuple(String, Int32)?
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects collect on a tuple-grouped option" do
+    assert_compile_time_error "`collect` folds one value per occurrence", <<-CR
+      require "../src/kebab"
+      module Conv
+        def self.convert(input : String) : Int32 | Kebab::Convert::Failure
+          Kebab::Convert.convert(Int32, input)
+        end
+        def self.collect(values : Array(Int32)) : Tuple(Int32, Int32) | Kebab::Convert::Failure
+          {values[0], values[1]}
+        end
+      end
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(converter: Conv)]
+        getter pair : Tuple(Int32, Int32)?
       end
       C.parse([] of String)
       CR
