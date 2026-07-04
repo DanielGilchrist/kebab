@@ -71,6 +71,6 @@ describe Kebab::Completion::Shell do
   end
 
   it "parses from the CLI via Convert::Enum" do
-    Kebab::Convert::Enum(Kebab::Completion::Shell).parse("zsh").should eq(Kebab::Completion::Shell::Zsh)
+    Kebab::Convert::Enum(Kebab::Completion::Shell).convert("zsh").should eq(Kebab::Completion::Shell::Zsh)
   end
 end
