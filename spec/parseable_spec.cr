@@ -261,6 +261,62 @@ describe Kebab::Parseable do
     error.should be_a(Kebab::Error::MissingValue)
   end
 
+  it "lets a declared digit short win over negative-looking tokens" do
+    DigitShort.parse(["-1"]).as(DigitShort).one?.should be_true
+    DigitShort.parse(["-5"]).should be_a(Kebab::Error::UnknownOption)
+    DigitShort.parse(["--", "-5"]).as(DigitShort).offset.should eq(-5)
+  end
+
+  it "parses multi-digit and decimal negative positionals" do
+    NegativeArgs.parse(["-19", "-1.5"]).as(NegativeArgs).offset.should eq(-19)
+    NegativeArgs.parse(["-19", "-1.5"]).as(NegativeArgs).scales.should eq([-1.5])
+  end
+
+  it "lets the field judge a dash-digit token that isn't a clean number" do
+    error = NegativeArgs.parse(["-5abc"]).as(Kebab::Error::InvalidValue)
+    error.value.should eq("-5abc")
+    NegativeText.parse(["-5abc"]).as(NegativeText).text.should eq("-5abc")
+  end
+
+  it "keeps a letter short unknown even when a String positional could take it" do
+    NegativeText.parse(["-x"]).should be_a(Kebab::Error::UnknownOption)
+  end
+
+  it "parses scientific notation through a float field" do
+    NegativeArgs.parse(["-19", "-1e5"]).as(NegativeArgs).scales.should eq([-100_000.0])
+  end
+
+  it "reports a malformed negative decimal through the field" do
+    error = NegativeArgs.parse(["-19", "-1.2.3"]).as(Kebab::Error::InvalidValue)
+    error.value.should eq("-1.2.3")
+  end
+
+  it "passes a bare dash through as a positional" do
+    NegativeText.parse(["-"]).as(NegativeText).text.should eq("-")
+  end
+
+  it "keeps a dash-dot without a digit as an option" do
+    NegativeText.parse(["-."]).should be_a(Kebab::Error::UnknownOption)
+  end
+
+  it "keeps a dash-digit long option unknown" do
+    NegativeText.parse(["--5"]).should be_a(Kebab::Error::UnknownOption)
+  end
+
+  it "treats a digit inside a cluster as a short on a digit-short command" do
+    DigitShort.parse(["-19"]).should be_a(Kebab::Error::UnknownOption)
+  end
+
+  it "accepts negative numbers as option values regardless of digit shorts" do
+    parse_punch!(["--at", "-19"]).at.should eq("-19")
+  end
+
+  it "parses negative numbers as positionals" do
+    parsed = NegativeArgs.parse(["-5", "-0.5", "-.25"]).as(NegativeArgs)
+    parsed.offset.should eq(-5)
+    parsed.scales.should eq([-0.5, -0.25])
+  end
+
   it "accepts a negative number as an option value" do
     parse_punch!(["--at", "-3"]).at.should eq("-3")
     parse_punch!(["--at=-3"]).at.should eq("-3")
@@ -421,6 +477,33 @@ private struct CustomEnumHaver
 
   @[Kebab::Option(converter: AliasedEnumConverter)]
   getter format : SpecCustomEnum = SpecCustomEnum::Text
+end
+
+private struct NegativeText
+  include Kebab::Parseable
+
+  @[Kebab::Argument]
+  getter text : String
+end
+
+private struct DigitShort
+  include Kebab::Parseable
+
+  @[Kebab::Option(short: '1')]
+  getter? one : Bool = false
+
+  @[Kebab::Argument]
+  getter offset : Int32 = 0
+end
+
+private struct NegativeArgs
+  include Kebab::Parseable
+
+  @[Kebab::Argument]
+  getter offset : Int32
+
+  @[Kebab::Argument]
+  getter scales : Array(Float64) = [] of Float64
 end
 
 private struct VariadicRequired
