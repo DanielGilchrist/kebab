@@ -496,7 +496,19 @@ module Kebab
                     case %token.value
                     {% unless user_defined_help_subcommand %}
                       when "help"
-                        __kebab_bail(::Kebab::Help.new(__kebab_help_text))
+                        # `app help sub` shows sub's help, like `app sub --help`. Bare `help` shows this command's.
+                        if %index + 1 < args.size
+                          case %help = {{@type}}.__kebab_parse(args[(%index + 1)..] + ["--help"], @__kebab_parent_path, @__kebab_inherited_globals)
+                          when ::Kebab::Help
+                            __kebab_bail(%help)
+                          when ::Kebab::Errors
+                            __kebab_bail(%help)
+                          else
+                            __kebab_bail(::Kebab::Help.new(__kebab_help_text))
+                          end
+                        else
+                          __kebab_bail(::Kebab::Help.new(__kebab_help_text))
+                        end
                     {% end %}
                     {% for member, member_index in subcommand_members %}
                       when {{subcommand_names[member_index]}}

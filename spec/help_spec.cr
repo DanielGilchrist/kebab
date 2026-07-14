@@ -134,6 +134,18 @@ describe "Kebab::Parseable help" do
     help_for(result).should contain("Usage: clockin start [options]")
   end
 
+  it "drills into the subcommand for `command help sub`" do
+    help_for(HelpSpecClock.parse(["help", "start"])).should eq(help_for(HelpSpecClock.parse(["start", "--help"])))
+  end
+
+  it "shows this command's help for a bare `help`" do
+    help_for(HelpSpecClock.parse(["help"])).should contain("Usage: clockin")
+  end
+
+  it "errors on `help` for an unknown subcommand" do
+    HelpSpecClock.parse(["help", "nope"]).should be_a(Kebab::Error::UnknownCommand)
+  end
+
   it "takes priority over unknown option errors at the point reached" do
     HelpSpecClock.parse(["--help", "--nope"]).should be_a(Kebab::Help)
   end
