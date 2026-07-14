@@ -36,10 +36,16 @@ struct Report
   @[Kebab::Argument(description: "X/Y data points")]
   getter points : Array(Tuple(Float64, Float64)) = [] of Tuple(Float64, Float64)
 
+  # `count: true` on an integer field counts occurrences: -vvv gives 3.
+  # UInt8 here, but any int type works.
+  @[Kebab::Option(short: 'v', count: true, description: "Increase verbosity, repeatable")]
+  getter verbosity : UInt8 = 0
+
   def run : Nil
     puts "columns: #{column.join(", ")}"
     puts "tags:    #{tag.join(", ")}"
     puts "range:   #{range[0]}..#{range[1]}"
+    puts "verbosity: #{verbosity}"
     points.each { |(x, y)| puts "point:   #{x} @ #{y}" }
   end
 end

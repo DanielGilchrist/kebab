@@ -6,6 +6,7 @@
 
 ```sh
 crystal run main.cr -- report 1 2 3.5 4 --column time -c cost --tag q1 --tag final --range 0 50
+crystal run main.cr -- report -vvv --column time    # verbosity 3
 crystal run main.cr -- gather --files a.csv b.csv c.csv
 crystal run main.cr -- report --help
 
@@ -46,6 +47,10 @@ Error: option "--range" expects 2 values, got 1.
 ```
 Error: "3" wasn't expected here.
 ```
+
+### Counting occurrences
+
+`verbosity : UInt8` with `count: true` counts how many times the flag appears: `-vvv`, `-v -v -v`, and `--verbosity` three times all give 3. It takes no value and never ends a short cluster, so `-vvc time` counts twice and still reads `-c`. Any integer type works, `UInt8` just keeps it small.
 
 ### Variadic values
 
