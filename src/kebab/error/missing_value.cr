@@ -8,7 +8,7 @@ module Kebab
     # An option needed a value but didn't get one (e.g. `--at` at the end
     # of the arg list, or `--at --verbose`).
     abstract struct MissingValue < Error::Base
-      def initialize(@option : Schema::Option, @schema : Schema::Command, @got : Int32 = 0)
+      def initialize(@option : Schema::Option, @schema : Schema::Command, @got : Int32 = 0, @invoked : String? = nil)
         super(build_message)
       end
 
@@ -22,12 +22,13 @@ module Kebab
       getter got : Int32
 
       private def build_message : String
+        label = @invoked || "--#{@option.long}"
         expected = @option.min_values
-        return "option \"--#{@option.long}\" expects a value." if expected == 1 && @got.zero?
+        return "option \"#{label}\" expects a value." if expected == 1 && @got.zero?
 
         counted = "#{expected} value#{"s" if expected > 1}"
         counted = "at least #{counted}" if @option.variable?
-        "option \"--#{@option.long}\" expects #{counted}, got #{@got}."
+        "option \"#{label}\" expects #{counted}, got #{@got}."
       end
 
       def to_s(io : IO) : Nil

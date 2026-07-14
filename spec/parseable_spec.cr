@@ -283,10 +283,20 @@ describe Kebab::Parseable do
     parse_punch_error!(["--at", "--verbose"]).should be_a(Kebab::Error::MissingValue)
   end
 
+  it "names the option by the form the user typed" do
+    parse_punch_error!(["--at"]).message.should eq("option \"--at\" expects a value.")
+    parse_punch_error!(["-a"]).message.should eq("option \"-a\" expects a value.")
+  end
+
   it "errors when a built-in conversion fails" do
     error = parse_punch_error!(["--weeks", "potato"])
     error.should be_a(Kebab::Error::InvalidValue)
     error.message.should eq("\"potato\" isn't a valid whole number for \"--weeks\"")
+  end
+
+  it "names the option by the short form when a short-supplied value fails to convert" do
+    error = Repeater.parse(["-n", "potato"]).as(Kebab::Error::InvalidValue)
+    error.message.should eq("\"potato\" isn't a valid whole number for \"-n\"")
   end
 
   it "errors when a custom conversion fails" do
@@ -336,7 +346,9 @@ describe Kebab::Parseable do
   end
 
   it "errors on a repeated short option" do
-    parse_punch_error!(["-a", "8:45", "-a", "9:30"]).should be_a(Kebab::Error::RepeatedOption)
+    error = parse_punch_error!(["-a", "8:45", "-a", "9:30"])
+    error.should be_a(Kebab::Error::RepeatedOption)
+    error.message.should eq("option \"-a\" was given more than once.")
   end
 
   it "errors on a repeated flag" do

@@ -7,8 +7,8 @@ module Kebab
   module Error
     # The same option was supplied more than once.
     abstract struct RepeatedOption < Error::Base
-      def initialize(@option : Schema::Option, @schema : Schema::Command)
-        super("option \"--#{@option.long}\" was given more than once.")
+      def initialize(@option : Schema::Option, @schema : Schema::Command, @invoked : String? = nil)
+        super("option \"#{@invoked || "--#{@option.long}"}\" was given more than once.")
       end
 
       # The option that was repeated.
