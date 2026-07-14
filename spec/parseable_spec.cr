@@ -343,10 +343,10 @@ describe Kebab::Parseable do
     parse_punch_error!(["--verbose", "--verbose"]).should be_a(Kebab::Error::RepeatedOption)
   end
 
-  it "errors on an empty short cluster" do
+  it "reports the raw token for a malformed short like -=foo" do
     error = parse_punch_error!(["-=foo"])
     error.should be_a(Kebab::Error::UnknownOption)
-    error.message.should eq("\"-\" isn't a recognised option.")
+    error.message.should eq("\"-=foo\" isn't a recognised option.")
   end
 
   it "errors when an option value looks like another option" do

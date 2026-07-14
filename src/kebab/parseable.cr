@@ -438,7 +438,7 @@ module Kebab
                 in ::Kebab::Token::Shorts
                   %chars = %token.chars
                   if %chars.empty?
-                    __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: "-", schema: __kebab_schema_node))
+                    __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: %raw, schema: __kebab_schema_node))
                   end
                   %chars.each_char_with_index do |%char, %char_index|
                     %last_char = %char_index == %chars.size - 1
