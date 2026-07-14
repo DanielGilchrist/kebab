@@ -26,7 +26,7 @@ module Kebab
 
       # `true` if the option expects at least one value, `false` for flags.
       def takes_value? : Bool
-        min_values > 0 || max_values != 0
+        min_values > 0
       end
 
       # `true` if the number of values can vary per occurrence.
