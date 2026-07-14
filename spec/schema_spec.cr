@@ -27,6 +27,35 @@ private struct SchemaTasks
   getter command : SchemaAdd | SchemaList
 end
 
+enum SchemaFormat
+  Text
+  Json
+  PrettyJson
+end
+
+module SchemaAliasedFormat
+  def self.convert(input : String) : SchemaFormat | Kebab::Convert::Failure
+    SchemaFormat.parse?(input) || Kebab::Convert.failure
+  end
+end
+
+@[Kebab::Command(name: "render", summary: "Render")]
+private struct SchemaRender
+  include Kebab::Parseable
+
+  @[Kebab::Option(description: "Output format")]
+  getter format : SchemaFormat = SchemaFormat::Text
+
+  @[Kebab::Option(description: "Custom-converted format", converter: SchemaAliasedFormat)]
+  getter aliased : SchemaFormat = SchemaFormat::Text
+
+  @[Kebab::Option(description: "Free text")]
+  getter label : String?
+
+  @[Kebab::Argument(description: "Target format")]
+  getter target : SchemaFormat = SchemaFormat::Text
+end
+
 describe "Kebab::Parseable.schema" do
   it "builds a recursive command tree" do
     schema = SchemaTasks.schema
@@ -65,5 +94,27 @@ describe "Kebab::Parseable.schema" do
 
   it "treats a leaf command as having no subcommands" do
     SchemaAdd.schema.subcommands.should be_empty
+  end
+
+  describe "enum value choices" do
+    it "lists an enum option's values, sorted and underscored" do
+      format = SchemaRender.schema.options.find!(&.long.== "format")
+      format.value_choices.should eq(["json", "pretty_json", "text"])
+    end
+
+    it "lists an enum argument's values" do
+      target = SchemaRender.schema.arguments.find!(&.name.== "target")
+      target.value_choices.should eq(["json", "pretty_json", "text"])
+    end
+
+    it "leaves choices empty for a non-enum option" do
+      label = SchemaRender.schema.options.find!(&.long.== "label")
+      label.value_choices.should be_empty
+    end
+
+    it "leaves choices empty for an enum behind a custom converter" do
+      aliased = SchemaRender.schema.options.find!(&.long.== "aliased")
+      aliased.value_choices.should be_empty
+    end
   end
 end

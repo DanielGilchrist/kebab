@@ -204,6 +204,10 @@ describe "Kebab::Parseable global options" do
     GlobalSpecRoot.parse(["week", "--scope"]).as(Kebab::Errors).should be_a(Kebab::Error::MissingValue)
   end
 
+  it "names a global short by its typed form when it's missing a value after a subcommand" do
+    GlobalSpecRoot.parse(["week", "-s"]).as(Kebab::Error::MissingValue).message.should eq("option \"-s\" expects a value.")
+  end
+
   it "errors when a value global's value would be another flag" do
     GlobalSpecRoot.parse(["week", "--scope", "--no-colour"]).as(Kebab::Errors).should be_a(Kebab::Error::MissingValue)
   end

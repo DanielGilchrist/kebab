@@ -66,3 +66,17 @@ jobs:
 
       - name: Run specs
         run: crystal spec spec
+
+  examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crystal-lang/install-crystal@v1
+        with:
+          crystal: latest
+      - name: Build examples
+        run: |
+          for example in examples/*/main.cr; do
+            echo "Building $example"
+            crystal build --no-codegen "$example"
+          done

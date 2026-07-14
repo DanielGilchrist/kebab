@@ -16,7 +16,7 @@ module Kebab
       # Marker module included on the concrete error when the target type is `T`.
       module Of(T); end
 
-      def initialize(@value : String, @source : Schema::Option | Schema::Argument, @schema : Schema::Command, @target_name : String? = nil, @reason : String? = nil)
+      def initialize(@value : String, @source : Schema::Option | Schema::Argument, @schema : Schema::Command, @target_name : String? = nil, @reason : String? = nil, @invoked : String? = nil)
         super(build_message)
       end
 
@@ -54,7 +54,7 @@ module Kebab
 
       private def source_label : String
         case source = @source
-        in Schema::Option   then %("--#{source.long}")
+        in Schema::Option   then %("#{@invoked || "--#{source.long}"}")
         in Schema::Argument then %("<#{source.name}>")
         end
       end
@@ -64,13 +64,14 @@ module Kebab
         include InvalidValue::For(C)
         include InvalidValue::Of(T)
 
-        def self.from(failure : ::Kebab::Convert::Failure, *, value : String, source : Schema::Option | Schema::Argument, schema : ::Kebab::Schema::Command) : self
+        def self.from(failure : ::Kebab::Convert::Failure, *, value : String, source : Schema::Option | Schema::Argument, schema : ::Kebab::Schema::Command, invoked : String? = nil) : self
           new(
             value: value,
             source: source,
             schema: schema,
             target_name: failure.name,
             reason: failure.reason,
+            invoked: invoked,
           )
         end
 
