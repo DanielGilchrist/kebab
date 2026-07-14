@@ -2,7 +2,7 @@ module Kebab
   module Schema
     # A positional argument declared on a command.
     struct Argument
-      def initialize(*, @name : String, @description : String, @variadic : Bool = false, @value_count : Int32 = 1)
+      def initialize(*, @name : String, @description : String, @variadic : Bool = false, @value_count : Int32 = 1, @value_choices : Array(String) = [] of String)
       end
 
       # The argument name (used as the placeholder in `<name>` in usage output).
@@ -18,6 +18,10 @@ module Kebab
       # size for `Tuple` arguments. A variadic consumes the remainder in groups
       # of this size.
       getter value_count : Int32
+
+      # The accepted values for an enum-typed argument, in help order. Empty when
+      # the values aren't a fixed set kebab knows (any non-enum, or a custom converter).
+      getter value_choices : Array(String)
     end
   end
 end

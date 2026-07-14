@@ -51,6 +51,19 @@ struct HelpSpecTrimWithOption
   getter path : String
 end
 
+enum HelpSpecFormat
+  Text
+  Json
+end
+
+@[Kebab::Command(name: "render", summary: "Render output")]
+struct HelpSpecRender
+  include Kebab::Parseable
+
+  @[Kebab::Option(description: "Output format")]
+  getter format : HelpSpecFormat = HelpSpecFormat::Text
+end
+
 private def help_for(result) : String
   case result
   when Kebab::Help
@@ -148,5 +161,9 @@ describe "Kebab::Parseable help" do
 
   it "takes priority over unknown option errors at the point reached" do
     HelpSpecClock.parse(["--help", "--nope"]).should be_a(Kebab::Help)
+  end
+
+  it "advertises an enum option's accepted values" do
+    help_for(HelpSpecRender.parse(["--help"])).should contain("--format <value>  Output format [values: json, text]")
   end
 end

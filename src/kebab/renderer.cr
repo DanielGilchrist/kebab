@@ -38,13 +38,19 @@ module Kebab
       left = short ? "-#{short}, --#{option.long}" : "    --#{option.long}"
       option.value_names.each { |name| left = "#{left} <#{name}>" }
       left = "#{left}..." if option.variable?
-      {left, option.description}
+      {left, describe(option.description, option.value_choices)}
     end
 
     def row(argument : Schema::Argument) : Tuple(String, String)
       left = Array.new(argument.value_count, "<#{argument.name}>").join(' ')
       left = "#{left}..." if argument.variadic?
-      {left, argument.description}
+      {left, describe(argument.description, argument.value_choices)}
+    end
+
+    private def describe(description : String, choices : Array(String)) : String
+      return description if choices.empty?
+      values = "[values: #{choices.join(", ")}]"
+      description.empty? ? values : "#{description} #{values}"
     end
   end
 end

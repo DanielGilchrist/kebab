@@ -113,10 +113,11 @@ module Kebab
                   converter = argument[:converter]
                   collects = converter && (converter.resolve.class.methods + converter.resolve.methods).any? { |method| method.name.stringify == "collect" }
                   argument_specs << {
-                    arg_name:    argument[:name] || ivar.name.stringify.gsub(/_/, "-"),
-                    description: argument[:description] || "",
-                    variadic:    !!(variadic || collects),
-                    width:       inner <= ::Tuple ? inner.type_vars.size : 1,
+                    arg_name:     argument[:name] || ivar.name.stringify.gsub(/_/, "-"),
+                    description:  argument[:description] || "",
+                    variadic:     !!(variadic || collects),
+                    width:        inner <= ::Tuple ? inner.type_vars.size : 1,
+                    choices_enum: (!converter && inner < ::Enum) ? inner : nil,
                   }
                 elsif option = ivar.annotation(::Kebab::Option)
                   base = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil }.first : ivar.type
@@ -151,13 +152,14 @@ module Kebab
                                   (1..min_values).map { "value" }
                                 end
                   option_specs << {
-                    long:        option[:long] || ivar.name.stringify.gsub(/_/, "-"),
-                    short:       option[:short],
-                    description: option[:description] || "",
-                    value_names: value_names,
-                    min_values:  min_values,
-                    max_values:  max_values,
-                    global:      option[:global],
+                    long:         option[:long] || ivar.name.stringify.gsub(/_/, "-"),
+                    short:        option[:short],
+                    description:  option[:description] || "",
+                    value_names:  value_names,
+                    min_values:   min_values,
+                    max_values:   max_values,
+                    global:       option[:global],
+                    choices_enum: (!option[:converter] && occurrence < ::Enum) ? occurrence : nil,
                   }
                 end
               end
@@ -181,7 +183,7 @@ module Kebab
 
             %options = [
               {% for spec in option_specs %}
-                ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}}),
+                ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}}, value_choices: {% if spec[:choices_enum] %}{{spec[:choices_enum]}}.names.map(&.underscore).sort{% else %}[] of ::String{% end %}),
               {% end %}
             ] of ::Kebab::Schema::Option
 
@@ -204,7 +206,7 @@ module Kebab
               options: %options,
               arguments: [
                 {% for spec in argument_specs %}
-                  ::Kebab::Schema::Argument.new(name: {{spec[:arg_name]}}, description: {{spec[:description]}}, variadic: {{spec[:variadic]}}, value_count: {{spec[:width]}}),
+                  ::Kebab::Schema::Argument.new(name: {{spec[:arg_name]}}, description: {{spec[:description]}}, variadic: {{spec[:variadic]}}, value_count: {{spec[:width]}}, value_choices: {% if spec[:choices_enum] %}{{spec[:choices_enum]}}.names.map(&.underscore).sort{% else %}[] of ::String{% end %}),
                 {% end %}
               ] of ::Kebab::Schema::Argument,
               subcommands: [
