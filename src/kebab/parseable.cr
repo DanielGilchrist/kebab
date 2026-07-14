@@ -204,7 +204,7 @@ module Kebab
               options: %options,
               arguments: [
                 {% for spec in argument_specs %}
-                  ::Kebab::Schema::Argument.new({{spec[:arg_name]}}, {{spec[:description]}}, {{spec[:variadic]}}, value_count: {{spec[:width]}}),
+                  ::Kebab::Schema::Argument.new(name: {{spec[:arg_name]}}, description: {{spec[:description]}}, variadic: {{spec[:variadic]}}, value_count: {{spec[:width]}}),
                 {% end %}
               ] of ::Kebab::Schema::Argument,
               subcommands: [

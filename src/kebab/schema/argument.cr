@@ -2,7 +2,7 @@ module Kebab
   module Schema
     # A positional argument declared on a command.
     struct Argument
-      def initialize(@name : String, @description : String, @variadic : Bool = false, @value_count : Int32 = 1)
+      def initialize(*, @name : String, @description : String, @variadic : Bool = false, @value_count : Int32 = 1)
       end
 
       # The argument name (used as the placeholder in `<name>` in usage output).

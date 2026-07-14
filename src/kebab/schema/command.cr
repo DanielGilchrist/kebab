@@ -12,6 +12,7 @@ module Kebab
     # what drives `[options]` in the usage line.
     struct Command
       def initialize(
+        *,
         @path : Array(String),
         @summary : String,
         @options : Array(Option) = [] of Option,

@@ -2,7 +2,7 @@ module Kebab
   module Schema
     # An option flag declared on a command.
     struct Option
-      def initialize(@long : String, @short : Char?, @description : String, @value_names : Array(String), @min_values : Int32, @max_values : Int32?)
+      def initialize(*, @long : String, @short : Char?, @description : String, @value_names : Array(String), @min_values : Int32, @max_values : Int32?)
       end
 
       # The long flag name without the leading `--`.
