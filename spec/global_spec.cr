@@ -34,6 +34,9 @@ struct GlobalSpecCount
   @[Kebab::Option(global: true, short: 'v', count: true)]
   getter verbosity : Int32 = 0
 
+  @[Kebab::Option(global: true, short: 'q')]
+  getter? quiet : Bool = false
+
   @[Kebab::Subcommand]
   getter command : GlobalSpecWeek
 end
@@ -235,5 +238,25 @@ describe "Kebab::Parseable global options" do
     GlobalSpecCount.parse(["-v", "week", "-v"]).as(GlobalSpecCount).verbosity.should eq(2)
     GlobalSpecCount.parse(["week", "-v", "-v"]).as(GlobalSpecCount).verbosity.should eq(2)
     GlobalSpecCount.parse(["-vv", "week"]).as(GlobalSpecCount).verbosity.should eq(2)
+  end
+
+  it "hoists a clustered counted global from after a subcommand" do
+    GlobalSpecCount.parse(["week", "-vv"]).as(GlobalSpecCount).verbosity.should eq(2)
+    GlobalSpecCount.parse(["week", "-vvv"]).as(GlobalSpecCount).verbosity.should eq(3)
+  end
+
+  it "hoists a cluster of distinct valueless globals from after a subcommand" do
+    counted = GlobalSpecCount.parse(["week", "-vq"]).as(GlobalSpecCount)
+    counted.verbosity.should eq(1)
+    counted.quiet?.should be_true
+  end
+
+  it "routes an inline value on a hoisted global cluster to the right error" do
+    error = GlobalSpecCount.parse(["week", "-vv=x"]).as(Kebab::Error::InvalidValue)
+    error.reason.should eq("flags don't accept inline values")
+  end
+
+  it "leaves a mixed global/local cluster alone, so the boundary still errors" do
+    GlobalSpecCluster.parse(["go", "-vf"]).as(Kebab::Errors).should be_a(Kebab::Error::UnknownOption)
   end
 end

@@ -737,11 +737,16 @@ module Kebab
                   letter = token.chars[0]
                   matched = globals.find { |option| option.short == letter }
                   invoked = "-#{letter}"
-                elsif token.chars.size > 1 && (candidate = globals.find { |option| option.short == token.chars[0] })
-                  # An attached-value global (`-steam`) hoists whole, its value already in the token.
-                  if candidate.takes_value?
-                    matched = candidate
+                elsif token.chars.size > 1
+                  first = globals.find { |option| option.short == token.chars[0] }
+                  if first && first.takes_value?
+                    # An attached-value global (`-steam`) hoists whole, its value already in the token.
+                    matched = first
                     inline = token.chars[1..]
+                  elsif token.chars.each_char.all? { |char| globals.any? { |option| option.short == char && !option.takes_value? } }
+                    # A cluster of valueless globals (`-vv`, `-vq`) hoists whole and parses in place.
+                    # A single non-global letter (like a subcommand's own flag) leaves the token alone.
+                    matched = first
                   end
                 end
               end
