@@ -795,12 +795,36 @@ describe "compile-time rejections", tags: "compile" do
   end
 
   it "rejects nested tuples" do
-    assert_compile_time_error "Tuple values must be simple types", <<-CR
+    assert_compile_time_error "Value types must be simple", <<-CR
       require "../src/kebab"
       struct C
         include Kebab::Parseable
         @[Kebab::Option]
         getter deep : Tuple(Int32, Tuple(Int32, Int32))?
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects nested arrays" do
+    assert_compile_time_error "Value types must be simple", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option]
+        getter deep : Array(Array(Int32)) = [] of Array(Int32)
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a nested array argument" do
+    assert_compile_time_error "Value types must be simple", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Argument]
+        getter deep : Array(Array(Int32)) = [] of Array(Int32)
       end
       C.parse([] of String)
       CR

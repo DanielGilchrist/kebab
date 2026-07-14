@@ -86,7 +86,7 @@ module Kebab
               raise "@[Kebab::Argument] '#{ivar.name}' has type `#{element}`. A one-value tuple is a plain value. Use `#{element.type_vars.first}` directly."
             end
             if element_types.any? { |element_type| element_type <= ::Tuple || element_type.name(generic_args: false).stringify == "Array" }
-              raise "Field '#{ivar.name}' on #{@type} has type `#{base}`. Tuple values must be simple types. Nested tuples and arrays can't parse from the command line."
+              raise "Field '#{ivar.name}' on #{@type} has type `#{base}`. Value types must be simple. Nested tuples and arrays can't parse from the command line."
             end
             if base.name(generic_args: false).stringify == "Array" && ivar.type.nilable?
               raise "Variadic argument '#{ivar.name}' on #{@type} can't be nilable. Use `Array(T)` (and default to `[] of T` for optional)."
@@ -137,7 +137,7 @@ module Kebab
               raise "@[Kebab::Option] '#{ivar.name}' has type `#{option_occurrence}`. A one-value tuple is a plain value. Use `#{option_occurrence.type_vars.first}` directly."
             end
             if option_value_types.any? { |value_type| value_type <= ::Tuple || value_type.name(generic_args: false).stringify == "Array" }
-              raise "Field '#{ivar.name}' on #{@type} has type `#{option_base}`. Tuple values must be simple types. Nested tuples and arrays can't parse from the command line."
+              raise "Field '#{ivar.name}' on #{@type} has type `#{option_base}`. Value types must be simple. Nested tuples and arrays can't parse from the command line."
             end
             if arity = option[:arity]
               arity_bounds = arity.is_a?(RangeLiteral) ? [arity.begin, arity.end] : [arity]
