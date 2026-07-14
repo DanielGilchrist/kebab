@@ -301,7 +301,6 @@ module Kebab
                     collects:    collects,
                     count:       counted,
                     repeatable:  array || collects || counted,
-                    takes_value: base != Bool,
                     global:      option && option[:global],
                   }
                 end
@@ -436,7 +435,7 @@ module Kebab
                               reason: "flags don't accept inline values",
                             ))
                           end
-                          %value{spec[:name]} = (%value{spec[:name]} || {{spec[:base]}}.zero) + 1
+                          __kebab_count_up(%value{spec[:name]}, {{spec[:base]}})
                         {% else %}
                           __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %token.value, %index, %separated, {{spec[:base]}}, {{spec[:element]}}, {{spec[:tuple_types]}}, {{spec[:array]}}, {{spec[:collects]}}, {{spec[:converter]}}, {{spec[:min_values]}}, {{spec[:max_values]}}, nil)
                         {% end %}
@@ -494,7 +493,7 @@ module Kebab
                               ))
                             end
                             # A counted short takes no value and does not end the cluster.
-                            %value{spec[:name]} = (%value{spec[:name]} || {{spec[:base]}}.zero) + 1
+                            __kebab_count_up(%value{spec[:name]}, {{spec[:base]}})
                           {% else %}
                             # A valued short ends the cluster: the rest is its value (`-j4`), or the next token when it's last (`-j 4`).
                             if %last_char
@@ -949,6 +948,13 @@ module Kebab
           end
         {% end %}
       {% end %}
+    end
+
+    # Counts one more occurrence, saturating at the type's maximum so a flood of
+    # flags (`-vvv...`) can never overflow a narrow int and break `never raises`.
+    macro __kebab_count_up(value, base)
+      %current = {{value}} || {{base}}.zero
+      {{value}} = %current < {{base}}::MAX ? %current + 1 : %current
     end
 
     macro __kebab_convert_value(base, source, raw, converter, invoked = nil)

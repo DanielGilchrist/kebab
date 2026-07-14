@@ -1215,6 +1215,14 @@ describe "counted flags" do
     quiet.should be_a(UInt8)
   end
 
+  it "saturates at the type maximum instead of overflowing" do
+    # The short cluster path.
+    Counter.parse(["-" + "q" * 255]).as(Counter).quiet.should eq(255)
+    Counter.parse(["-" + "q" * 256]).as(Counter).quiet.should eq(255)
+    # The long path, which increments at a separate site.
+    Counter.parse(Array.new(256, "--quiet")).as(Counter).quiet.should eq(255)
+  end
+
   it "rejects an inline value like a flag" do
     long = Counter.parse(["--verbosity=3"]).as(Kebab::Error::InvalidValue)
     long.reason.should eq("flags don't accept inline values")
