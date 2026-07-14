@@ -422,7 +422,7 @@ module Kebab
                           end
                           %value{spec[:name]} = true
                         {% else %}
-                          __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %token, %index, %separated, {{spec[:base]}}, {{spec[:element]}}, {{spec[:tuple_types]}}, {{spec[:array]}}, {{spec[:collects]}}, {{spec[:converter]}}, {{spec[:min_values]}}, {{spec[:max_values]}})
+                          __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %token.value, %index, %separated, {{spec[:base]}}, {{spec[:element]}}, {{spec[:tuple_types]}}, {{spec[:array]}}, {{spec[:collects]}}, {{spec[:converter]}}, {{spec[:min_values]}}, {{spec[:max_values]}})
                         {% end %}
                     {% end %}
                     {% unless user_defined_help_long %}
@@ -466,9 +466,16 @@ module Kebab
                             end
                             %value{spec[:name]} = true
                           {% else %}
-                            __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(%schema{spec[:name]}, schema: __kebab_schema_node)) unless %last_char
-
-                            __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %token, %index, %separated, {{spec[:base]}}, {{spec[:element]}}, {{spec[:tuple_types]}}, {{spec[:array]}}, {{spec[:collects]}}, {{spec[:converter]}}, {{spec[:min_values]}}, {{spec[:max_values]}})
+                            # A valued short ends the cluster: the rest is its value (`-j4`), or the next token when it's last (`-j 4`).
+                            if %last_char
+                              __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %token.value, %index, %separated, {{spec[:base]}}, {{spec[:element]}}, {{spec[:tuple_types]}}, {{spec[:array]}}, {{spec[:collects]}}, {{spec[:converter]}}, {{spec[:min_values]}}, {{spec[:max_values]}})
+                            else
+                              # The tokenizer split any `=` into `value`, so put it back: `-Dfoo=bar` gives `-D` the value `foo=bar`.
+                              %attached = %chars[(%char_index + 1)..]
+                              %attached = "#{%attached}=#{%token.value}" if %token.value
+                              __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %attached, %index, %separated, {{spec[:base]}}, {{spec[:element]}}, {{spec[:tuple_types]}}, {{spec[:array]}}, {{spec[:collects]}}, {{spec[:converter]}}, {{spec[:min_values]}}, {{spec[:max_values]}})
+                              break
+                            end
                           {% end %}
                       {% end %}
                       {% unless user_defined_help_short %}
@@ -684,6 +691,12 @@ module Kebab
                   inline = token.value
                   letter = token.chars[0]
                   matched = globals.find { |option| option.short == letter }
+                elsif token.chars.size > 1 && (candidate = globals.find { |option| option.short == token.chars[0] })
+                  # An attached-value global (`-steam`) hoists whole, its value already in the token.
+                  if candidate.takes_value?
+                    matched = candidate
+                    inline = token.chars[1..]
+                  end
                 end
               end
 
@@ -814,9 +827,9 @@ module Kebab
 
     # One occurrence of a valued option: consume its values, convert them, and
     # store them on `value`. Shared by the long and short parsing branches.
-    macro __kebab_option_value(value, raws, schema, token, index, separated, base, element, tuple_types, array, collects, converter, min_values, max_values)
+    macro __kebab_option_value(value, raws, schema, inline, index, separated, base, element, tuple_types, array, collects, converter, min_values, max_values)
       {% if min_values == 1 && max_values == 1 %}
-        %raw_value = {{token}}.value || __kebab_next_value(args, {{index}}, {{separated}}, {{schema}}).tap { {{index}} += 1 }
+        %raw_value = {{inline}} || __kebab_next_value(args, {{index}}, {{separated}}, {{schema}}).tap { {{index}} += 1 }
         {% if collects %}
           %element = __kebab_convert_element({{schema}}, %raw_value, {{converter}})
           if %existing = {{value}}
@@ -840,7 +853,7 @@ module Kebab
           {{value}} = __kebab_convert_value({{base}}, {{schema}}, %raw_value, {{converter}})
         {% end %}
       {% else %}
-        if %inline = {{token}}.value
+        if %inline = {{inline}}
           __kebab_bail(::Kebab::Error::InvalidValue::Exact({{base}}, {{@type}}).new(
             value: %inline,
             source: {{schema}},

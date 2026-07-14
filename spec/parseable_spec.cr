@@ -231,6 +231,30 @@ describe Kebab::Parseable do
     punch.at.should eq("8:45")
   end
 
+  it "takes an attached value on a short option" do
+    parse_punch!(["-a8:45"]).at.should eq("8:45")
+    parse_punch!(["-a=8:45"]).at.should eq("8:45")
+    parse_punch!(["-a", "8:45"]).at.should eq("8:45")
+  end
+
+  it "keeps an equals sign inside an attached short value" do
+    parse_punch!(["-afoo=bar"]).at.should eq("foo=bar")
+    parse_punch!(["-safoo=bar"]).at.should eq("foo=bar")
+  end
+
+  it "ends a cluster at the first valued short and takes the rest as its value" do
+    punch = parse_punch!(["-sa8:45"])
+    punch.skip_validations?.should be_true
+    punch.at.should eq("8:45")
+
+    # `a` is valued, so `-as` reads `s` as its value rather than a second flag.
+    parse_punch!(["-as"]).at.should eq("s")
+  end
+
+  it "takes an attached negative value on a short option" do
+    parse_punch!(["-a-3"]).at.should eq("-3")
+  end
+
   it "converts built-in number types" do
     parse_punch!(["--weeks", "12"]).weeks.should eq(12)
   end
@@ -257,10 +281,6 @@ describe Kebab::Parseable do
   it "errors when a value is missing" do
     parse_punch_error!(["--at"]).should be_a(Kebab::Error::MissingValue)
     parse_punch_error!(["--at", "--verbose"]).should be_a(Kebab::Error::MissingValue)
-  end
-
-  it "errors when a valued short option is not last in a cluster" do
-    parse_punch_error!(["-as", "8:45"]).should be_a(Kebab::Error::MissingValue)
   end
 
   it "errors when a built-in conversion fails" do
@@ -808,6 +828,11 @@ describe "multi-value options and arguments" do
     MultiValue.parse(["-p", "a", "b", "-p", "c", "d"]).as(MultiValue).pair.should eq(["a", "b", "c", "d"])
   end
 
+  it "rejects an attached value on a multi-value short" do
+    error = MultiValue.parse(["-pa"]).as(Kebab::Error::InvalidValue)
+    error.reason.should eq("takes multiple values as separate tokens, not inline")
+  end
+
   it "consumes greedily up to the arity minimum with a range" do
     Greedy.parse(["--files", "a", "b", "c"]).as(Greedy).files.should eq(["a", "b", "c"])
     error = Greedy.parse(["--files", "a"]).as(Kebab::Error::MissingValue)
@@ -887,6 +912,10 @@ describe "repeatable options" do
 
   it "converts each occurrence via the element type" do
     Repeater.parse(["-n", "1", "-n", "2"]).as(Repeater).num.should eq([1, 2])
+  end
+
+  it "collects attached short values across occurrences" do
+    Repeater.parse(["-n1", "-n2"]).as(Repeater).num.should eq([1, 2])
   end
 
   it "accepts inline values" do

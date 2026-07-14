@@ -123,6 +123,15 @@ describe "Kebab::Parseable global options" do
     parse_root!(["week", "--scope=team"]).scope.should eq("team")
   end
 
+  it "accepts a global short with an attached value on either side of the subcommand" do
+    parse_root!(["-steam", "week"]).scope.should eq("team")
+    parse_root!(["week", "-steam"]).scope.should eq("team")
+  end
+
+  it "keeps an equals sign in a global short's attached value after the subcommand" do
+    parse_root!(["week", "-skey=val"]).scope.should eq("key=val")
+  end
+
   it "accepts a global flag after a nested subcommand" do
     root = parse_root!(["day", "week", "--no-colour"])
     root.no_colour?.should be_true
@@ -202,5 +211,9 @@ describe "Kebab::Parseable global options" do
   it "does not consume a token that preceded the value global" do
     # `week --scope` must not treat `week` (the subcommand) as scope's value
     GlobalSpecRoot.parse(["week", "--scope"]).should_not be_a(GlobalSpecRoot)
+  end
+
+  it "reports an error rather than crashing on a short with an empty name" do
+    GlobalSpecRoot.parse(["-=x"]).as(Kebab::Errors).should be_a(Kebab::Error::UnknownOption)
   end
 end
