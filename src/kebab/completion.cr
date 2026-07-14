@@ -39,20 +39,33 @@ module Kebab
     end
 
     # :nodoc:
-    # Every flag in the tree that takes a value, so the generated scripts can
-    # skip the value when rebuilding the command path from the typed words.
-    def valued_flags(node : ::Kebab::Schema::Command) : Array(String)
-      flags = [] of String
+    # Every flag in the tree that takes values, mapped to how many the
+    # generated scripts must skip when rebuilding the command path from the
+    # typed words. Nil means variable arity: skip until the next flag.
+    def valued_flags(node : ::Kebab::Schema::Command) : Hash(String, Int32?)
+      flags = {} of String => Int32?
+      collect_valued_flags(node, flags)
+      flags
+    end
+
+    private def collect_valued_flags(node : ::Kebab::Schema::Command, flags : Hash(String, Int32?)) : Nil
       node.options.each do |option|
         next unless option.takes_value?
 
-        flags << "--#{option.long}"
-        if short = option.short
-          flags << "-#{short}"
+        count = option.variable? ? nil : option.min_values
+        ["--#{option.long}", option.short.try { |short| "-#{short}" }].compact.each do |flag|
+          existing = flags[flag]?
+          # The same name can take different counts on different commands.
+          # Prefer variable, then the larger count. Over-skipping only costs
+          # suggestions, under-skipping pollutes the path.
+          if !flags.has_key?(flag)
+            flags[flag] = count
+          elsif existing && (count.nil? || count > existing)
+            flags[flag] = count
+          end
         end
       end
-      node.subcommands.each { |subcommand| flags.concat(valued_flags(subcommand)) }
-      flags.uniq!.sort!
+      node.subcommands.each { |subcommand| collect_valued_flags(subcommand, flags) }
     end
   end
 end

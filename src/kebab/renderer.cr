@@ -36,12 +36,14 @@ module Kebab
     def row(option : Schema::Option) : Tuple(String, String)
       short = option.short
       left = short ? "-#{short}, --#{option.long}" : "    --#{option.long}"
-      left = "#{left} <value>" if option.takes_value?
+      option.value_names.each { |name| left = "#{left} <#{name}>" }
+      left = "#{left}..." if option.variable?
       {left, option.description}
     end
 
     def row(argument : Schema::Argument) : Tuple(String, String)
-      left = argument.variadic? ? "<#{argument.name}>..." : "<#{argument.name}>"
+      left = Array.new(argument.value_count, "<#{argument.name}>").join(' ')
+      left = "#{left}..." if argument.variadic?
       {left, argument.description}
     end
   end

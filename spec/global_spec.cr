@@ -56,6 +56,26 @@ struct GlobalSpecCluster
   getter command : GlobalSpecGo
 end
 
+struct GlobalSpecRepeat
+  include Kebab::Parseable
+
+  @[Kebab::Option(global: true)]
+  getter tag : Array(String) = [] of String
+
+  @[Kebab::Subcommand]
+  getter command : GlobalSpecWeek
+end
+
+struct GlobalSpecPair
+  include Kebab::Parseable
+
+  @[Kebab::Option(global: true)]
+  getter range : Tuple(Int32, Int32) = {0, 0}
+
+  @[Kebab::Subcommand]
+  getter command : GlobalSpecWeek
+end
+
 private def parse_root!(args : Array(String)) : GlobalSpecRoot
   GlobalSpecRoot.parse(args).as(GlobalSpecRoot)
 end
@@ -73,6 +93,24 @@ describe "Kebab::Parseable global options" do
     root.command.should be_a(GlobalSpecWeek)
   end
 
+  it "collects a repeatable global across the subcommand boundary" do
+    root = GlobalSpecRepeat.parse(["--tag", "a", "week", "--tag", "b"]).as(GlobalSpecRepeat)
+    root.tag.should eq(["a", "b"])
+    root.command.should be_a(GlobalSpecWeek)
+  end
+
+  it "hoists every value of a fixed-arity global" do
+    root = GlobalSpecPair.parse(["week", "--range", "1", "2"]).as(GlobalSpecPair)
+    root.range.should eq({1, 2})
+    error = GlobalSpecPair.parse(["week", "--range", "1"]).as(Kebab::Error::MissingValue)
+    error.message.should eq(%(option "--range" expects 2 values, got 1.))
+  end
+
+  it "doesn't dispatch subcommands after --" do
+    error = GlobalSpecRepeat.parse(["--", "week"]).as(Kebab::Error::UnexpectedArgument)
+    error.value.should eq("week")
+  end
+
   it "accepts a global value option after the subcommand" do
     parse_root!(["week", "--scope", "team"]).scope.should eq("team")
   end
@@ -83,6 +121,15 @@ describe "Kebab::Parseable global options" do
 
   it "accepts a global value option as an inline value" do
     parse_root!(["week", "--scope=team"]).scope.should eq("team")
+  end
+
+  it "accepts a global short with an attached value on either side of the subcommand" do
+    parse_root!(["-steam", "week"]).scope.should eq("team")
+    parse_root!(["week", "-steam"]).scope.should eq("team")
+  end
+
+  it "keeps an equals sign in a global short's attached value after the subcommand" do
+    parse_root!(["week", "-skey=val"]).scope.should eq("key=val")
   end
 
   it "accepts a global flag after a nested subcommand" do
@@ -164,5 +211,9 @@ describe "Kebab::Parseable global options" do
   it "does not consume a token that preceded the value global" do
     # `week --scope` must not treat `week` (the subcommand) as scope's value
     GlobalSpecRoot.parse(["week", "--scope"]).should_not be_a(GlobalSpecRoot)
+  end
+
+  it "reports an error rather than crashing on a short with an empty name" do
+    GlobalSpecRoot.parse(["-=x"]).as(Kebab::Errors).should be_a(Kebab::Error::UnknownOption)
   end
 end

@@ -14,11 +14,17 @@ module Kebab
           io << "  cur=\"${COMP_WORDS[COMP_CWORD]}\"\n"
           io << "  cmd=\"" << name << "\"\n"
           valued = Completion.valued_flags(command)
+          fixed = valued.compact_map { |flag, count| {flag, count} if count }.group_by { |(_, count)| count }
+          variable = valued.compact_map { |flag, count| flag if count.nil? }.sort!
           io << "  for ((i = 1; i < COMP_CWORD; i++)); do\n"
           io << "    case \"${COMP_WORDS[i]}\" in\n"
           io << "      -*=*) ;;\n"
-          unless valued.empty?
-            io << "      " << valued.join('|') << ") ((i++)) ;;\n"
+          fixed.keys.sort!.each do |count|
+            flags = fixed[count].map { |(flag, _)| flag }.sort!
+            io << "      " << flags.join('|') << ") ((i+=" << count << ")) ;;\n"
+          end
+          unless variable.empty?
+            io << "      " << variable.join('|') << ") while ((i + 1 < COMP_CWORD)) && [[ \"${COMP_WORDS[i+1]}\" != -* ]]; do ((i++)); done ;;\n"
           end
           io << "      -*) ;;\n"
           io << "      *) cmd=\"${cmd}__${COMP_WORDS[i]}\" ;;\n"

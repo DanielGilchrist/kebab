@@ -48,6 +48,17 @@ private struct CompTri
   getter command : CompMid
 end
 
+@[Kebab::Command(name: "multi", summary: "Multi-value")]
+private struct CompMulti
+  include Kebab::Parseable
+
+  @[Kebab::Option]
+  getter pair : Tuple(Int32, Int32) = {0, 0}
+
+  @[Kebab::Option(arity: 1..)]
+  getter files : Array(String) = [] of String
+end
+
 describe Kebab::Completion::Shell do
   describe "#generate (fish)" do
     it "disables file completion and names the binary from the schema" do
@@ -79,6 +90,14 @@ describe Kebab::Completion::Shell do
       script.should contain("set skip 1")
     end
 
+    it "skips multi-value and variable options by their counts" do
+      script = Kebab::Completion::Shell::Fish.generate(CompMulti.schema)
+      script.should contain("case '--pair'")
+      script.should contain("set skip 2")
+      script.should contain("case '--files'")
+      script.should contain("set greedy 1")
+    end
+
     it "honours a binary-name override" do
       script = Kebab::Completion::Shell::Fish.generate(CompTasks.schema, "tw")
       script.should contain("complete -c tw -f")
@@ -96,7 +115,13 @@ describe Kebab::Completion::Shell do
 
     it "skips a valued option's value when rebuilding the path" do
       script = Kebab::Completion::Shell::Bash.generate(CompTasks.schema)
-      script.should contain("--priority|-p) ((i++)) ;;")
+      script.should contain("--priority|-p) ((i+=1)) ;;")
+    end
+
+    it "skips multi-value and variable options by their counts" do
+      script = Kebab::Completion::Shell::Bash.generate(CompMulti.schema)
+      script.should contain("--pair) ((i+=2)) ;;")
+      script.should contain("--files) while ((i + 1 < COMP_CWORD)) && [[ \"${COMP_WORDS[i+1]}\" != -* ]]; do ((i++)); done ;;")
     end
   end
 
@@ -110,7 +135,13 @@ describe Kebab::Completion::Shell do
 
     it "skips a valued option's value when rebuilding the path" do
       script = Kebab::Completion::Shell::Zsh.generate(CompTasks.schema)
-      script.should contain("--priority|-p) ((i++)) ;;")
+      script.should contain("--priority|-p) ((i+=1)) ;;")
+    end
+
+    it "skips multi-value and variable options by their counts" do
+      script = Kebab::Completion::Shell::Zsh.generate(CompMulti.schema)
+      script.should contain("--pair) ((i+=2)) ;;")
+      script.should contain("--files) while ((i + 1 < CURRENT)) && [[ \"${words[i+1]}\" != -* ]]; do ((i++)); done ;;")
     end
   end
 

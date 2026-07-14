@@ -1,3 +1,4 @@
+require "./error/invalid_collection"
 require "./error/invalid_value"
 require "./error/missing_argument"
 require "./error/missing_command"
@@ -9,7 +10,8 @@ require "./error/unknown_command"
 require "./error/unknown_option"
 
 module Kebab
-  alias Errors = Error::InvalidValue |
+  alias Errors = Error::InvalidCollection |
+                 Error::InvalidValue |
                  Error::MissingArgument |
                  Error::MissingCommand |
                  Error::MissingOption |

@@ -57,7 +57,7 @@ module Kebab
           Usage::Arguments.new(
             @path,
             has_options: @has_options,
-            argument_names: @arguments.map(&.name),
+            argument_names: @arguments.flat_map { |argument| Array.new(argument.value_count, argument.name) },
             has_variadic_tail: !@arguments.empty? && @arguments.last.variadic?,
           )
         else

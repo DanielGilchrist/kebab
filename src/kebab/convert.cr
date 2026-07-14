@@ -9,6 +9,16 @@ module Kebab
   # T | Kebab::Convert::Failure`. Attach one to a field with
   # `@[Kebab::Option(converter: MyConverter)]` or
   # `@[Kebab::Argument(converter: MyConverter)]`.
+  #
+  # A converter that also defines `collect(values : Array(T)) : F |
+  # Kebab::Convert::Failure` makes its option repeatable: every occurrence goes
+  # through `convert`, then `collect` builds the field (of type `F`) from all of
+  # them. On the last positional argument, `collect` folds the remaining
+  # positionals the same way. `collect` is never called with an empty array. An
+  # absent field uses its default instead.
+  #
+  # On an `Array(T)` field, `convert` may return `Array(T)` to yield several
+  # elements from one value (like splitting on commas).
   module Convert
     extend self
 
