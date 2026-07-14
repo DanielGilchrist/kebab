@@ -237,6 +237,7 @@ describe "Kebab::Parseable global options" do
   it "accumulates a counted global on either side of a subcommand" do
     GlobalSpecCount.parse(["-v", "week", "-v"]).as(GlobalSpecCount).verbosity.should eq(2)
     GlobalSpecCount.parse(["week", "-v", "-v"]).as(GlobalSpecCount).verbosity.should eq(2)
+    GlobalSpecCount.parse(["week", "--verbosity", "--verbosity"]).as(GlobalSpecCount).verbosity.should eq(2)
     GlobalSpecCount.parse(["-vv", "week"]).as(GlobalSpecCount).verbosity.should eq(2)
   end
 
