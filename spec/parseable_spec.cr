@@ -814,6 +814,15 @@ describe "multi-value options and arguments" do
     error.message.should eq(%(option "--range" expects 2 values, got 1.))
   end
 
+  it "errors when an occurrence is cut short by a following option" do
+    error = MultiValue.parse(["--range", "1", "--pair", "a", "b"]).as(Kebab::Error::MissingValue)
+    error.message.should eq(%(option "--range" expects 2 values, got 1.))
+  end
+
+  it "errors when a tuple option is repeated" do
+    MultiValue.parse(["--range", "1", "2", "--range", "3", "4"]).as(Kebab::Error::RepeatedOption)
+  end
+
   it "rejects inline values on multi-value options" do
     error = MultiValue.parse(["--range=1,10"]).as(Kebab::Error::InvalidValue)
     error.reason.should eq("takes multiple values as separate tokens, not inline")
