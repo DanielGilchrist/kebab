@@ -11,7 +11,8 @@ module Kebab
   # value. Accepts `long : String`, `short : Char`, `description : String`,
   # `converter : Type`, `global : Bool` (recognised throughout the command's
   # subtree, including after subcommands), `arity : Int | Range` (values per
-  # occurrence), and `value_names : Tuple` (the `<name>` placeholders in help).
+  # occurrence), `value_names : Tuple` (the `<name>` placeholders in help), and
+  # `count : Bool` (an integer flag of any width that counts occurrences, like `-vvv`).
   annotation Option; end
 
   # Marks a field as a positional argument. Accepts `name : String`,

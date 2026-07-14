@@ -28,6 +28,16 @@ struct GlobalSpecRoot
   getter command : GlobalSpecWeek | GlobalSpecDay
 end
 
+struct GlobalSpecCount
+  include Kebab::Parseable
+
+  @[Kebab::Option(global: true, short: 'v', count: true)]
+  getter verbosity : Int32 = 0
+
+  @[Kebab::Subcommand]
+  getter command : GlobalSpecWeek
+end
+
 struct GlobalSpecLeaf
   include Kebab::Parseable
 
@@ -219,5 +229,11 @@ describe "Kebab::Parseable global options" do
 
   it "reports an error rather than crashing on a short with an empty name" do
     GlobalSpecRoot.parse(["-=x"]).as(Kebab::Errors).should be_a(Kebab::Error::UnknownOption)
+  end
+
+  it "accumulates a counted global on either side of a subcommand" do
+    GlobalSpecCount.parse(["-v", "week", "-v"]).as(GlobalSpecCount).verbosity.should eq(2)
+    GlobalSpecCount.parse(["week", "-v", "-v"]).as(GlobalSpecCount).verbosity.should eq(2)
+    GlobalSpecCount.parse(["-vv", "week"]).as(GlobalSpecCount).verbosity.should eq(2)
   end
 end

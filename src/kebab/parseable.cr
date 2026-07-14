@@ -124,10 +124,11 @@ module Kebab
                   array = base.name(generic_args: false).stringify == "Array"
                   occurrence = array ? base.type_vars.first : base
                   tuple = occurrence <= ::Tuple
+                  counted = !!option[:count]
                   arity = option[:arity]
                   min_values = 0
                   max_values = 0
-                  if base != Bool
+                  if base != Bool && !counted
                     if tuple
                       min_values = occurrence.type_vars.size
                       max_values = occurrence.type_vars.size
@@ -144,7 +145,7 @@ module Kebab
                   end
                   value_names = if names = option[:value_names]
                                   names.map { |name| name }
-                                elsif base == Bool
+                                elsif base == Bool || counted
                                   [] of Nil
                                 elsif max_values != min_values
                                   ["value"]
@@ -251,10 +252,11 @@ module Kebab
                   array = base.name(generic_args: false).stringify == "Array"
                   occurrence = array ? base.type_vars.first : base
                   tuple = occurrence <= ::Tuple
+                  counted = !!(option && option[:count])
                   arity = option && option[:arity]
                   min_values = 0
                   max_values = 0
-                  if base != Bool
+                  if base != Bool && !counted
                     if tuple
                       min_values = occurrence.type_vars.size
                       max_values = occurrence.type_vars.size
@@ -271,7 +273,7 @@ module Kebab
                   end
                   value_names = if names = option && option[:value_names]
                                   names.map { |name| name }
-                                elsif base == Bool
+                                elsif base == Bool || counted
                                   [] of Nil
                                 elsif max_values != min_values
                                   ["value"]
@@ -297,7 +299,8 @@ module Kebab
                     max_values:  max_values,
                     value_names: value_names,
                     collects:    collects,
-                    repeatable:  array || collects,
+                    count:       counted,
+                    repeatable:  array || collects || counted,
                     takes_value: base != Bool,
                     global:      option && option[:global],
                   }
@@ -423,6 +426,17 @@ module Kebab
                             ))
                           end
                           %value{spec[:name]} = true
+                        {% elsif spec[:count] %}
+                          if %inline = %token.value
+                            __kebab_bail(::Kebab::Error::InvalidValue::Exact({{spec[:base]}}, {{@type}}).new(
+                              value: %inline,
+                              source: %schema{spec[:name]},
+                              schema: __kebab_schema_node,
+                              target_name: "flag",
+                              reason: "flags don't accept inline values",
+                            ))
+                          end
+                          %value{spec[:name]} = (%value{spec[:name]} || {{spec[:base]}}.zero) + 1
                         {% else %}
                           __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %token.value, %index, %separated, {{spec[:base]}}, {{spec[:element]}}, {{spec[:tuple_types]}}, {{spec[:array]}}, {{spec[:collects]}}, {{spec[:converter]}}, {{spec[:min_values]}}, {{spec[:max_values]}}, nil)
                         {% end %}
@@ -468,6 +482,19 @@ module Kebab
                               ))
                             end
                             %value{spec[:name]} = true
+                          {% elsif spec[:count] %}
+                            if %last_char && (%inline = %token.value)
+                              __kebab_bail(::Kebab::Error::InvalidValue::Exact({{spec[:base]}}, {{@type}}).new(
+                                value: %inline,
+                                source: %schema{spec[:name]},
+                                schema: __kebab_schema_node,
+                                target_name: "flag",
+                                reason: "flags don't accept inline values",
+                                invoked: "-#{%char}",
+                              ))
+                            end
+                            # A counted short takes no value and does not end the cluster.
+                            %value{spec[:name]} = (%value{spec[:name]} || {{spec[:base]}}.zero) + 1
                           {% else %}
                             # A valued short ends the cluster: the rest is its value (`-j4`), or the next token when it's last (`-j 4`).
                             if %last_char
@@ -624,6 +651,8 @@ module Kebab
                   if %assigned{spec[:name]}.nil?
                     {% if spec[:ivar].has_default_value? %}
                       {{spec[:ivar].default_value}}
+                    {% elsif spec[:count] %}
+                      {{spec[:base]}}.zero
                     {% elsif spec[:base] == Bool %}
                       false
                     {% elsif spec[:ivar].type.nilable? %}
