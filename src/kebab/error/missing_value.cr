@@ -23,11 +23,17 @@ module Kebab
 
       private def build_message : String
         label = @invoked || "--#{@option.long}"
-        expected = @option.min_values
-        return "option \"#{label}\" expects a value." if expected == 1 && @got.zero?
+        min = @option.min_values
+        return "option \"#{label}\" expects a value." if min == 1 && !@option.variable? && @got.zero?
 
-        counted = "#{expected} value#{"s" if expected > 1}"
-        counted = "at least #{counted}" if @option.variable?
+        counted =
+          if !@option.variable?
+            "#{min} value#{"s" if min > 1}"
+          elsif max = @option.max_values
+            "#{min} to #{max} values"
+          else
+            "at least #{min} value#{"s" if min > 1}"
+          end
         "option \"#{label}\" expects #{counted}, got #{@got}."
       end
 

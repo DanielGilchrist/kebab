@@ -64,6 +64,23 @@ struct HelpSpecRender
   getter format : HelpSpecFormat = HelpSpecFormat::Text
 end
 
+@[Kebab::Command(name: "collect", summary: "Collect things")]
+struct HelpSpecRepeat
+  include Kebab::Parseable
+
+  @[Kebab::Option(short: 'v', count: true, description: "Verbosity")]
+  getter verbosity : Int32 = 0
+
+  @[Kebab::Option(description: "Tags")]
+  getter tag : Array(String) = [] of String
+
+  @[Kebab::Option(arity: 2..4, value_names: {"file"}, description: "Files")]
+  getter files : Array(String) = [] of String
+
+  @[Kebab::Option(short: 'n', description: "Name")]
+  getter name : String?
+end
+
 private def help_for(result) : String
   case result
   when Kebab::Help
@@ -165,5 +182,19 @@ describe "Kebab::Parseable help" do
 
   it "advertises an enum option's accepted values" do
     help_for(HelpSpecRender.parse(["--help"])).should contain("--format <value>  Output format [values: json, text]")
+  end
+
+  it "separates values-per-occurrence (...) from repeat-the-flag ([repeatable])" do
+    text = help_for(HelpSpecRepeat.parse(["--help"]))
+
+    # `...` means more values in one occurrence; the bracket means say it again.
+    text.should contain("Verbosity [repeatable]") # count: no value, repeats
+    text.should_not contain("--verbosity...")
+    text.should contain("--tag <value>") # list: one value, repeats
+    text.should contain("Tags [repeatable]")
+    text.should_not contain("--tag <value>...")
+    text.should contain("--files <file> <file>...")      # variadic: more values here
+    text.should contain("[up to 4 values] [repeatable]") # and repeatable
+    text.should_not contain("Name [repeatable]")         # scalar: neither
   end
 end

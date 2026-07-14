@@ -5,7 +5,7 @@ struct Build
   include Kebab::Parseable
 
   # Any int type works.
-  @[Kebab::Option(short: 'v', count: true, description: "Increase verbosity, repeatable")]
+  @[Kebab::Option(short: 'v', count: true, description: "Increase verbosity")]
   getter verbosity : UInt8 = 0
 
   @[Kebab::Option(short: 'q', description: "Suppress the summary line")]

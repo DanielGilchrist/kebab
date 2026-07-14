@@ -56,6 +56,23 @@ private struct SchemaRender
   getter target : SchemaFormat = SchemaFormat::Text
 end
 
+@[Kebab::Command(name: "gather", summary: "Gather")]
+private struct SchemaRepeat
+  include Kebab::Parseable
+
+  @[Kebab::Option(description: "Tags")]
+  getter tag : Array(String) = [] of String
+
+  @[Kebab::Option(count: true, description: "Verbosity")]
+  getter verbosity : Int32 = 0
+
+  @[Kebab::Option(description: "Label")]
+  getter label : String?
+
+  @[Kebab::Option(description: "Force")]
+  getter? force : Bool = false
+end
+
 describe "Kebab::Parseable.schema" do
   it "builds a recursive command tree" do
     schema = SchemaTasks.schema
@@ -115,6 +132,24 @@ describe "Kebab::Parseable.schema" do
     it "leaves choices empty for an enum behind a custom converter" do
       aliased = SchemaRender.schema.options.find!(&.long.== "aliased")
       aliased.value_choices.should be_empty
+    end
+  end
+
+  describe "option repetition" do
+    it "classifies how each option accumulates across occurrences" do
+      options = SchemaRepeat.schema.options
+      options.find!(&.long.== "tag").repetition.collect?.should be_true
+      options.find!(&.long.== "verbosity").repetition.count?.should be_true
+      options.find!(&.long.== "label").repetition.none?.should be_true
+      options.find!(&.long.== "force").repetition.none?.should be_true
+    end
+
+    it "derives repeatable? from the repetition" do
+      options = SchemaRepeat.schema.options
+      options.find!(&.long.== "tag").repeatable?.should be_true
+      options.find!(&.long.== "verbosity").repeatable?.should be_true
+      options.find!(&.long.== "label").repeatable?.should be_false
+      options.find!(&.long.== "force").repeatable?.should be_false
     end
   end
 end

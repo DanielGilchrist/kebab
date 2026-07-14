@@ -143,15 +143,15 @@ module Kebab
                       max_values = 1
                     end
                   end
-                  value_names = if names = option[:value_names]
-                                  names.map { |name| name }
-                                elsif base == Bool || counted
+                  value_names = if base == Bool || counted
                                   [] of Nil
-                                elsif max_values != min_values
-                                  ["value"]
+                                elsif names = option[:value_names]
+                                  max_values != min_values ? (1..min_values).map { names.first } : names.map { |name| name }
                                 else
                                   (1..min_values).map { "value" }
                                 end
+                  converter = option[:converter]
+                  collects = converter && (converter.resolve.class.methods + converter.resolve.methods).any? { |method| method.name.stringify == "collect" }
                   option_specs << {
                     long:         option[:long] || ivar.name.stringify.gsub(/_/, "-"),
                     short:        option[:short],
@@ -160,7 +160,8 @@ module Kebab
                     min_values:   min_values,
                     max_values:   max_values,
                     global:       option[:global],
-                    choices_enum: (!option[:converter] && occurrence < ::Enum) ? occurrence : nil,
+                    repetition:   counted ? "Count" : (array || collects) ? "Collect" : "None",
+                    choices_enum: (!converter && occurrence < ::Enum) ? occurrence : nil,
                   }
                 end
               end
@@ -184,7 +185,7 @@ module Kebab
 
             %options = [
               {% for spec in option_specs %}
-                ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}}, value_choices: {% if spec[:choices_enum] %}{{spec[:choices_enum]}}.names.map(&.underscore).sort{% else %}[] of ::String{% end %}),
+                ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}}, value_choices: {% if spec[:choices_enum] %}{{spec[:choices_enum]}}.names.map(&.underscore).sort{% else %}[] of ::String{% end %}, repetition: ::Kebab::Schema::Option::Repetition::{{spec[:repetition].id}}),
               {% end %}
             ] of ::Kebab::Schema::Option
 
@@ -271,12 +272,10 @@ module Kebab
                       max_values = 1
                     end
                   end
-                  value_names = if names = option && option[:value_names]
-                                  names.map { |name| name }
-                                elsif base == Bool || counted
+                  value_names = if base == Bool || counted
                                   [] of Nil
-                                elsif max_values != min_values
-                                  ["value"]
+                                elsif names = option && option[:value_names]
+                                  max_values != min_values ? (1..min_values).map { names.first } : names.map { |name| name }
                                 else
                                   (1..min_values).map { "value" }
                                 end
@@ -301,6 +300,7 @@ module Kebab
                     collects:    collects,
                     count:       counted,
                     repeatable:  array || collects || counted,
+                    repetition:  counted ? "Count" : (array || collects) ? "Collect" : "None",
                     global:      option && option[:global],
                   }
                 end
@@ -366,7 +366,7 @@ module Kebab
               {% end %}
 
               {% for spec in option_specs %}
-                %schema{spec[:name]} = ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}})
+                %schema{spec[:name]} = ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}}, repetition: ::Kebab::Schema::Option::Repetition::{{spec[:repetition].id}})
               {% end %}
               {% for spec in argument_specs %}
                 %arg_schema{spec[:name]} = ::Kebab::Schema::Argument.new(name: {{spec[:arg_name]}}, description: {{spec[:description]}}, variadic: {{spec[:variadic]}}, value_count: {{spec[:width]}})

@@ -796,6 +796,20 @@ private struct Greedy
   getter files : Array(String) = [] of String
 end
 
+private struct BoundedArity
+  include Kebab::Parseable
+
+  @[Kebab::Option(arity: 2..4, value_names: {"file"})]
+  getter files : Array(String) = [] of String
+end
+
+private struct DefaultArity
+  include Kebab::Parseable
+
+  @[Kebab::Option(arity: 2..)]
+  getter items : Array(String) = [] of String
+end
+
 private struct MoveArgs
   include Kebab::Parseable
 
@@ -860,10 +874,24 @@ describe "multi-value options and arguments" do
     error.message.should eq(%(option "--files" expects at least 2 values, got 1.))
   end
 
+  it "states a bounded arity's cap in help and errors alike" do
+    help = BoundedArity.parse(["--help"]).as(Kebab::Help).text
+    help.should contain("--files <file> <file>...")
+    help.should contain("[up to 4 values] [repeatable]")
+
+    error = BoundedArity.parse(["--files", "a"]).as(Kebab::Error::MissingValue)
+    error.message.should eq(%(option "--files" expects 2 to 4 values, got 1.))
+  end
+
+  it "repeats the default placeholder to the minimum for an unnamed variable arity" do
+    DefaultArity.parse(["--help"]).as(Kebab::Help).text.should contain("--items <value> <value>...")
+  end
+
   it "renders value names and variable tails in help" do
     range_help = MultiValue.parse(["--help"]).as(Kebab::Help).text
     range_help.should contain("--range <min> <max>")
-    Greedy.parse(["--help"]).as(Kebab::Help).text.should contain("--files <file>...")
+    # An open range renders one placeholder per required value, then `...`.
+    Greedy.parse(["--help"]).as(Kebab::Help).text.should contain("--files <file> <file>...")
   end
 
   it "binds tuple arguments and grouped variadic tails" do

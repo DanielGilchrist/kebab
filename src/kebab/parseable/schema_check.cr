@@ -276,7 +276,7 @@ module Kebab
             expected = spec[:max_values] != spec[:min_values] ? 1 : spec[:min_values]
             if names.size != expected
               if spec[:max_values] != spec[:min_values]
-                raise "@[Kebab::Option(value_names:)] on '#{spec[:name].id}': a variable-arity option gets one name (rendered `<#{names.first}>...`), got #{names.size}."
+                raise "@[Kebab::Option(value_names:)] on '#{spec[:name].id}': a variable-arity option gets one name, repeated to its minimum in help, got #{names.size}."
               else
                 raise "@[Kebab::Option(value_names:)] on '#{spec[:name].id}' names #{names.size} values, but --#{spec[:long].id} takes #{expected}."
               end

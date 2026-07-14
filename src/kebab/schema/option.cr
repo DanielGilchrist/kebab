@@ -2,7 +2,23 @@ module Kebab
   module Schema
     # An option flag declared on a command.
     struct Option
-      def initialize(*, @long : String, @short : Char?, @description : String, @value_names : Array(String), @min_values : Int32, @max_values : Int32?, @value_choices : Array(String) = [] of String)
+      # How the option accumulates across occurrences. This is the axis
+      # `min_values`/`max_values` can't express: a flag and a counter are both
+      # `0..0`, a scalar and a repeatable value are both `1..1`. Whether the
+      # option takes a value is `takes_value?` (from `min_values`); this is only
+      # about repetition, so the two never encode the same fact twice.
+      enum Repetition
+        # Given at most once (a flag, or a value option that isn't repeatable).
+        None
+
+        # Repeats to increment a counter, like `-vvv`. Takes no value.
+        Count
+
+        # Repeats to accumulate values, like `--tag a --tag b`.
+        Collect
+      end
+
+      def initialize(*, @long : String, @short : Char?, @description : String, @value_names : Array(String), @min_values : Int32, @max_values : Int32?, @value_choices : Array(String) = [] of String, @repetition : Repetition = Repetition::None)
       end
 
       # The long flag name without the leading `--`.
@@ -27,6 +43,14 @@ module Kebab
       # The accepted values for an enum-typed option, in help order. Empty when
       # the values aren't a fixed set kebab knows (any non-enum, or a custom converter).
       getter value_choices : Array(String)
+
+      # How the option accumulates across occurrences: `None`, `Count`, or `Collect`.
+      getter repetition : Repetition
+
+      # `true` if the option can be given more than once (a `Count` or `Collect`).
+      def repeatable? : Bool
+        !repetition.none?
+      end
 
       # `true` if the option expects at least one value, `false` for flags.
       def takes_value? : Bool
