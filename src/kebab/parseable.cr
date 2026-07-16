@@ -14,16 +14,48 @@ require "./schema/usage"
 require "./token"
 
 module Kebab
-  # Included on a `struct` to make it parseable from `Array(String)` args.
-  # See the project README for examples.
+  # Mix into a `struct` to parse it from command-line arguments.
+  #
+  # Annotate the struct with `Kebab::Command`, its fields with `Kebab::Option`,
+  # `Kebab::Argument`, or `Kebab::Subcommand`, then call `.parse` or `.run`.
+  #
+  # ```
+  # @[Kebab::Command(summary: "Greet someone")]
+  # struct Greet
+  #   include Kebab::Parseable
+  #
+  #   @[Kebab::Argument(description: "Name to greet")]
+  #   getter name : String
+  #
+  #   @[Kebab::Option(short: 'l', description: "Make it loud")]
+  #   getter? loud : Bool = false
+  # end
+  #
+  # case result = Greet.parse(["-l", "Ada"])
+  # in Greet         then puts result.loud? ? "HELLO #{result.name}" : "Hello #{result.name}"
+  # in Kebab::Help   then puts result        # the user passed --help
+  # in Kebab::Errors then STDERR.puts result # the input was invalid
+  # end
+  # ```
+  #
+  # ### Parsing and dispatch
+  #
+  # `.parse` never raises. It returns the parsed struct, a `Kebab::Help` when the
+  # user asked for help, or a `Kebab::Errors` when the input was invalid, so
+  # Crystal's `case ... in` makes you handle all three.
+  #
+  # For a command that owns its behaviour, define `def run` and call `.run`, which
+  # parses, invokes `run` on success, and writes help and errors for you.
+  #
+  # `.schema` returns the command tree as a `Kebab::Schema::Command` for help,
+  # completion, and your own tooling.
   module Parseable
     macro included
       @__kebab_parent_path : Array(String) = [] of String
       @__kebab_inherited_globals : Array(::Kebab::Schema::Option) = [] of ::Kebab::Schema::Option
 
       # Parses `args` (defaulting to `ARGV`) into either an instance of `self`,
-      # a `Kebab::Help` (if the user asked for help), or one of the
-      # `Kebab::Errors` variants. Never raises.
+      # a `Kebab::Help` (if the user asked for help), or one of the `Kebab::Errors` variants.
       def self.parse(args : Array(String) = ARGV) : self | ::Kebab::Help | ::Kebab::Errors
         __kebab_parse(args, [] of String)
       end
@@ -62,8 +94,7 @@ module Kebab
       end
 
       # Returns the command and its whole subtree as an immutable
-      # `Kebab::Schema::Command`, derived at compile time. Pure and total,
-      # never raises.
+      # `Kebab::Schema::Command`, derived at compile time.
       def self.schema : ::Kebab::Schema::Command
         __kebab_schema([] of String)
       end
@@ -124,10 +155,11 @@ module Kebab
                   array = base.name(generic_args: false).stringify == "Array"
                   occurrence = array ? base.type_vars.first : base
                   tuple = occurrence <= ::Tuple
+                  counted = !!option[:count]
                   arity = option[:arity]
                   min_values = 0
                   max_values = 0
-                  if base != Bool
+                  if base != Bool && !counted
                     if tuple
                       min_values = occurrence.type_vars.size
                       max_values = occurrence.type_vars.size
@@ -142,15 +174,15 @@ module Kebab
                       max_values = 1
                     end
                   end
-                  value_names = if names = option[:value_names]
-                                  names.map { |name| name }
-                                elsif base == Bool
+                  value_names = if base == Bool || counted
                                   [] of Nil
-                                elsif max_values != min_values
-                                  ["value"]
+                                elsif names = option[:value_names]
+                                  max_values != min_values ? (1..min_values).map { names.first } : names.map { |name| name }
                                 else
                                   (1..min_values).map { "value" }
                                 end
+                  converter = option[:converter]
+                  collects = converter && (converter.resolve.class.methods + converter.resolve.methods).any? { |method| method.name.stringify == "collect" }
                   option_specs << {
                     long:         option[:long] || ivar.name.stringify.gsub(/_/, "-"),
                     short:        option[:short],
@@ -159,7 +191,8 @@ module Kebab
                     min_values:   min_values,
                     max_values:   max_values,
                     global:       option[:global],
-                    choices_enum: (!option[:converter] && occurrence < ::Enum) ? occurrence : nil,
+                    repetition:   counted ? "Count" : (array || collects) ? "Collect" : "None",
+                    choices_enum: (!converter && occurrence < ::Enum) ? occurrence : nil,
                   }
                 end
               end
@@ -183,7 +216,7 @@ module Kebab
 
             %options = [
               {% for spec in option_specs %}
-                ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}}, value_choices: {% if spec[:choices_enum] %}{{spec[:choices_enum]}}.names.map(&.underscore).sort{% else %}[] of ::String{% end %}),
+                ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}}, value_choices: {% if spec[:choices_enum] %}{{spec[:choices_enum]}}.names.map(&.underscore).sort{% else %}[] of ::String{% end %}, repetition: ::Kebab::Schema::Option::Repetition::{{spec[:repetition].id}}),
               {% end %}
             ] of ::Kebab::Schema::Option
 
@@ -251,10 +284,11 @@ module Kebab
                   array = base.name(generic_args: false).stringify == "Array"
                   occurrence = array ? base.type_vars.first : base
                   tuple = occurrence <= ::Tuple
+                  counted = !!(option && option[:count])
                   arity = option && option[:arity]
                   min_values = 0
                   max_values = 0
-                  if base != Bool
+                  if base != Bool && !counted
                     if tuple
                       min_values = occurrence.type_vars.size
                       max_values = occurrence.type_vars.size
@@ -269,12 +303,10 @@ module Kebab
                       max_values = 1
                     end
                   end
-                  value_names = if names = option && option[:value_names]
-                                  names.map { |name| name }
-                                elsif base == Bool
+                  value_names = if base == Bool || counted
                                   [] of Nil
-                                elsif max_values != min_values
-                                  ["value"]
+                                elsif names = option && option[:value_names]
+                                  max_values != min_values ? (1..min_values).map { names.first } : names.map { |name| name }
                                 else
                                   (1..min_values).map { "value" }
                                 end
@@ -297,8 +329,9 @@ module Kebab
                     max_values:  max_values,
                     value_names: value_names,
                     collects:    collects,
-                    repeatable:  array || collects,
-                    takes_value: base != Bool,
+                    count:       counted,
+                    repeatable:  array || collects || counted,
+                    repetition:  counted ? "Count" : (array || collects) ? "Collect" : "None",
                     global:      option && option[:global],
                   }
                 end
@@ -364,7 +397,7 @@ module Kebab
               {% end %}
 
               {% for spec in option_specs %}
-                %schema{spec[:name]} = ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}})
+                %schema{spec[:name]} = ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}}, repetition: ::Kebab::Schema::Option::Repetition::{{spec[:repetition].id}})
               {% end %}
               {% for spec in argument_specs %}
                 %arg_schema{spec[:name]} = ::Kebab::Schema::Argument.new(name: {{spec[:arg_name]}}, description: {{spec[:description]}}, variadic: {{spec[:variadic]}}, value_count: {{spec[:width]}})
@@ -423,6 +456,17 @@ module Kebab
                             ))
                           end
                           %value{spec[:name]} = true
+                        {% elsif spec[:count] %}
+                          if %inline = %token.value
+                            __kebab_bail(::Kebab::Error::InvalidValue::Exact({{spec[:base]}}, {{@type}}).new(
+                              value: %inline,
+                              source: %schema{spec[:name]},
+                              schema: __kebab_schema_node,
+                              target_name: "flag",
+                              reason: "flags don't accept inline values",
+                            ))
+                          end
+                          __kebab_count_up(%value{spec[:name]}, {{spec[:base]}})
                         {% else %}
                           __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %token.value, %index, %separated, {{spec[:base]}}, {{spec[:element]}}, {{spec[:tuple_types]}}, {{spec[:array]}}, {{spec[:collects]}}, {{spec[:converter]}}, {{spec[:min_values]}}, {{spec[:max_values]}}, nil)
                         {% end %}
@@ -468,6 +512,19 @@ module Kebab
                               ))
                             end
                             %value{spec[:name]} = true
+                          {% elsif spec[:count] %}
+                            if %last_char && (%inline = %token.value)
+                              __kebab_bail(::Kebab::Error::InvalidValue::Exact({{spec[:base]}}, {{@type}}).new(
+                                value: %inline,
+                                source: %schema{spec[:name]},
+                                schema: __kebab_schema_node,
+                                target_name: "flag",
+                                reason: "flags don't accept inline values",
+                                invoked: "-#{%char}",
+                              ))
+                            end
+                            # A counted short takes no value and does not end the cluster.
+                            __kebab_count_up(%value{spec[:name]}, {{spec[:base]}})
                           {% else %}
                             # A valued short ends the cluster: the rest is its value (`-j4`), or the next token when it's last (`-j 4`).
                             if %last_char
@@ -624,6 +681,8 @@ module Kebab
                   if %assigned{spec[:name]}.nil?
                     {% if spec[:ivar].has_default_value? %}
                       {{spec[:ivar].default_value}}
+                    {% elsif spec[:count] %}
+                      {{spec[:base]}}.zero
                     {% elsif spec[:base] == Bool %}
                       false
                     {% elsif spec[:ivar].type.nilable? %}
@@ -708,11 +767,16 @@ module Kebab
                   letter = token.chars[0]
                   matched = globals.find { |option| option.short == letter }
                   invoked = "-#{letter}"
-                elsif token.chars.size > 1 && (candidate = globals.find { |option| option.short == token.chars[0] })
-                  # An attached-value global (`-steam`) hoists whole, its value already in the token.
-                  if candidate.takes_value?
-                    matched = candidate
+                elsif token.chars.size > 1
+                  first = globals.find { |option| option.short == token.chars[0] }
+                  if first && first.takes_value?
+                    # An attached-value global (`-steam`) hoists whole, its value already in the token.
+                    matched = first
                     inline = token.chars[1..]
+                  elsif token.chars.each_char.all? { |char| globals.any? { |option| option.short == char && !option.takes_value? } }
+                    # A cluster of valueless globals (`-vv`, `-vq`) hoists whole and parses in place.
+                    # A single non-global letter (like a subcommand's own flag) leaves the token alone.
+                    matched = first
                   end
                 end
               end
@@ -915,6 +979,13 @@ module Kebab
           end
         {% end %}
       {% end %}
+    end
+
+    # Counts one more occurrence, saturating at the type's maximum so a flood of
+    # flags (`-vvv...`) can never overflow a narrow int.
+    macro __kebab_count_up(value, base)
+      %current = {{value}} || {{base}}.zero
+      {{value}} = %current < {{base}}::MAX ? %current + 1 : %current
     end
 
     macro __kebab_convert_value(base, source, raw, converter, invoked = nil)

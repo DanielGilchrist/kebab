@@ -2,7 +2,7 @@ module Kebab
   module Parseable
     macro __kebab_validate_schema
       {%
-        allowed_option_keys = ["short", "long", "description", "converter", "global", "arity", "value_names"]
+        allowed_option_keys = ["short", "long", "description", "converter", "global", "arity", "value_names", "count"]
         allowed_argument_keys = ["name", "description", "converter"]
         allowed_subcommand_keys = ["required"]
         allowed_command_keys = ["name", "summary"]
@@ -113,6 +113,9 @@ module Kebab
             if (global = option[:global]) && !global.is_a?(BoolLiteral)
               raise "@[Kebab::Option(global:)] on '#{ivar.name}' must be true or false, got `#{global}`."
             end
+            if (count = option[:count]) && !count.is_a?(BoolLiteral)
+              raise "@[Kebab::Option(count:)] on '#{ivar.name}' must be true or false, got `#{count}`."
+            end
             bases = ivar.type.union? ? ivar.type.union_types.reject { |union_type| union_type == Nil } : [ivar.type]
             if bases.size != 1
               raise "Field '#{ivar.name}' on #{@type} has an unsupported type: `#{ivar.type}`. " \
@@ -130,8 +133,28 @@ module Kebab
             option_occurrence = option_array ? option_base.type_vars.first : option_base
             option_tuple = option_occurrence <= ::Tuple
             option_value_types = option_tuple ? option_occurrence.type_vars : [option_occurrence]
+            if !!option[:count]
+              if ivar.type.nilable?
+                raise "Counted flag '#{ivar.name}' on #{@type} can't be nilable. Use `Int32 = 0`."
+              end
+              if option_base == Bool
+                raise "@[Kebab::Option(count:)] on '#{ivar.name}': a Bool flag is already a flag. Counting needs a number. Use `Int32 = 0`."
+              end
+              unless option_base < ::Int
+                raise "@[Kebab::Option(count:)] on '#{ivar.name}': a counted flag must be an integer type like `Int32` or `UInt8`. Use `Int32 = 0`."
+              end
+              if option[:converter]
+                raise "@[Kebab::Option(count:)] on '#{ivar.name}': a counted flag takes no value to convert. Remove the `converter:`."
+              end
+              if option[:arity]
+                raise "@[Kebab::Option(count:)] on '#{ivar.name}': a counted flag takes no values. Remove the `arity:`."
+              end
+              if option[:value_names]
+                raise "@[Kebab::Option(count:)] on '#{ivar.name}': a counted flag takes no values. Remove the `value_names:`."
+              end
+            end
             if option_base != Bool && option_value_types.any? { |value_type| value_type == Bool }
-              raise "@[Kebab::Option] '#{ivar.name}' has type `#{option_base}`. A flag can't take a value, so it can't be one of several. Use a plain `Bool`."
+              raise "@[Kebab::Option] '#{ivar.name}' has type `#{option_base}`. A flag can't take a value, so it can't be one of several. Use a plain `Bool`, or `Int32` with `count: true` for `-vvv` counting."
             end
             if option_tuple && option_occurrence.type_vars.size < 2
               raise "@[Kebab::Option] '#{ivar.name}' has type `#{option_occurrence}`. A one-value tuple is a plain value. Use `#{option_occurrence.type_vars.first}` directly."
@@ -192,9 +215,10 @@ module Kebab
           occurrence = array ? base.type_vars.first : base
           tuple = occurrence <= ::Tuple
           arity = option && option[:arity]
+          counted = !!(option && option[:count])
           min_values = 0
           max_values = 0
-          if base != Bool
+          if base != Bool && !counted
             if tuple
               min_values = occurrence.type_vars.size
               max_values = occurrence.type_vars.size
@@ -252,7 +276,7 @@ module Kebab
             expected = spec[:max_values] != spec[:min_values] ? 1 : spec[:min_values]
             if names.size != expected
               if spec[:max_values] != spec[:min_values]
-                raise "@[Kebab::Option(value_names:)] on '#{spec[:name].id}': a variable-arity option gets one name (rendered `<#{names.first}>...`), got #{names.size}."
+                raise "@[Kebab::Option(value_names:)] on '#{spec[:name].id}': a variable-arity option gets one name, repeated to its minimum in help, got #{names.size}."
               else
                 raise "@[Kebab::Option(value_names:)] on '#{spec[:name].id}' names #{names.size} values, but --#{spec[:long].id} takes #{expected}."
               end

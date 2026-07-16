@@ -796,6 +796,20 @@ private struct Greedy
   getter files : Array(String) = [] of String
 end
 
+private struct BoundedArity
+  include Kebab::Parseable
+
+  @[Kebab::Option(arity: 2..4, value_names: {"file"})]
+  getter files : Array(String) = [] of String
+end
+
+private struct DefaultArity
+  include Kebab::Parseable
+
+  @[Kebab::Option(arity: 2..)]
+  getter items : Array(String) = [] of String
+end
+
 private struct MoveArgs
   include Kebab::Parseable
 
@@ -860,10 +874,24 @@ describe "multi-value options and arguments" do
     error.message.should eq(%(option "--files" expects at least 2 values, got 1.))
   end
 
+  it "states a bounded arity's cap in help and errors alike" do
+    help = BoundedArity.parse(["--help"]).as(Kebab::Help).text
+    help.should contain("--files <file> <file>...")
+    help.should contain("[up to 4 values] [repeatable]")
+
+    error = BoundedArity.parse(["--files", "a"]).as(Kebab::Error::MissingValue)
+    error.message.should eq(%(option "--files" expects 2 to 4 values, got 1.))
+  end
+
+  it "repeats the default placeholder to the minimum for an unnamed variable arity" do
+    DefaultArity.parse(["--help"]).as(Kebab::Help).text.should contain("--items <value> <value>...")
+  end
+
   it "renders value names and variable tails in help" do
     range_help = MultiValue.parse(["--help"]).as(Kebab::Help).text
     range_help.should contain("--range <min> <max>")
-    Greedy.parse(["--help"]).as(Kebab::Help).text.should contain("--files <file>...")
+    # An open range renders one placeholder per required value, then `...`.
+    Greedy.parse(["--help"]).as(Kebab::Help).text.should contain("--files <file> <file>...")
   end
 
   it "binds tuple arguments and grouped variadic tails" do
@@ -1155,5 +1183,89 @@ describe "schema and parser agree on derived names" do
     files = Greedy.schema.options.find! { |option| option.long == "files" }
     files.min_values.should eq(2)
     files.max_values.should be_nil
+  end
+end
+
+private struct Counter
+  include Kebab::Parseable
+
+  @[Kebab::Option(short: 'v', count: true, description: "Increase verbosity")]
+  getter verbosity : Int32 = 0
+
+  @[Kebab::Option(short: 's')]
+  getter? sync : Bool = false
+
+  @[Kebab::Option(short: 'l', count: true)]
+  getter level : Int32 = 5
+
+  @[Kebab::Option(short: 'q', count: true)]
+  getter quiet : UInt8 = 0
+end
+
+private struct CountFalse
+  include Kebab::Parseable
+
+  @[Kebab::Option(count: false)]
+  getter n : Int32 = 0
+end
+
+describe "counted flags" do
+  it "counts occurrences across short clusters and repeats" do
+    Counter.parse(["-vvv"]).as(Counter).verbosity.should eq(3)
+    Counter.parse(["-v", "-v"]).as(Counter).verbosity.should eq(2)
+  end
+
+  it "counts long occurrences and mixed short/long" do
+    Counter.parse(["--verbosity", "--verbosity"]).as(Counter).verbosity.should eq(2)
+    Counter.parse(["-v", "--verbosity"]).as(Counter).verbosity.should eq(2)
+  end
+
+  it "counts without ending the cluster or consuming a value" do
+    counter = Counter.parse(["-vsv"]).as(Counter)
+    counter.verbosity.should eq(2)
+    counter.sync?.should be_true
+  end
+
+  it "falls back to the default when absent" do
+    absent = Counter.parse([] of String).as(Counter)
+    absent.verbosity.should eq(0)
+    absent.level.should eq(5)
+  end
+
+  it "counts from zero, not from a nonzero default" do
+    Counter.parse(["-l"]).as(Counter).level.should eq(1)
+    Counter.parse(["-l", "-l"]).as(Counter).level.should eq(2)
+  end
+
+  it "counts into any integer type, not just Int32" do
+    quiet = Counter.parse(["-qqq"]).as(Counter).quiet
+    quiet.should eq(3)
+    quiet.should be_a(UInt8)
+  end
+
+  it "saturates at the type maximum instead of overflowing" do
+    Counter.parse(["-" + "q" * 255]).as(Counter).quiet.should eq(255)
+    Counter.parse(["-" + "q" * 256]).as(Counter).quiet.should eq(255)
+    Counter.parse(Array.new(256, "--quiet")).as(Counter).quiet.should eq(255)
+  end
+
+  it "rejects an inline value like a flag" do
+    long = Counter.parse(["--verbosity=3"]).as(Kebab::Error::InvalidValue)
+    long.reason.should eq("flags don't accept inline values")
+    short = Counter.parse(["-v=3"]).as(Kebab::Error::InvalidValue)
+    short.reason.should eq("flags don't accept inline values")
+  end
+
+  it "advertises no value in its schema" do
+    verbosity = Counter.schema.options.find! { |option| option.long == "verbosity" }
+    verbosity.min_values.should eq(0)
+    verbosity.max_values.should eq(0)
+    verbosity.value_names.should be_empty
+    verbosity.takes_value?.should be_false
+  end
+
+  it "treats count: false as a normal valued option" do
+    CountFalse.parse(["--n", "5"]).as(CountFalse).n.should eq(5)
+    CountFalse.parse(["--n", "5", "--n", "6"]).as(Kebab::Errors).should be_a(Kebab::Error::RepeatedOption)
   end
 end

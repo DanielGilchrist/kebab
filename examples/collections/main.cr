@@ -24,7 +24,7 @@ end
 struct Report
   include Kebab::Parseable
 
-  @[Kebab::Option(short: 'c', converter: Columns, description: "Column to include, repeatable")]
+  @[Kebab::Option(short: 'c', converter: Columns, description: "Column to include")]
   getter column : Array(String) = [] of String
 
   @[Kebab::Option(converter: UniqueTags, description: "Tags, duplicates rejected")]

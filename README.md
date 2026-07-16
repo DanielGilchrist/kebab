@@ -58,6 +58,7 @@ Runnable walkthroughs in [`examples/`](examples/):
 - [`examples/completions/`](examples/completions/): generating fish, bash, and zsh completions.
 - [`examples/global/`](examples/global/): options usable anywhere in a command's subtree with `global: true`.
 - [`examples/collections/`](examples/collections/): repeated options, value groups, converters, and variadic arity.
+- [`examples/counting/`](examples/counting/): counting flag occurrences with `count: true`, like `-vvv`.
 - [`examples/testing/`](examples/testing/): testing commands with parse, injected dependencies, and captured IO.
 
 ## API docs

@@ -38,19 +38,24 @@ module Kebab
       left = short ? "-#{short}, --#{option.long}" : "    --#{option.long}"
       option.value_names.each { |name| left = "#{left} <#{name}>" }
       left = "#{left}..." if option.variable?
-      {left, describe(option.description, option.value_choices)}
+      notes = [] of String
+      notes << "[values: #{option.value_choices.join(", ")}]" unless option.value_choices.empty?
+      if option.variable? && (max = option.max_values)
+        notes << "[up to #{max} values]"
+      end
+      notes << "[repeatable]" if option.repeatable?
+      {left, describe(option.description, notes)}
     end
 
     def row(argument : Schema::Argument) : Tuple(String, String)
       left = Array.new(argument.value_count, "<#{argument.name}>").join(' ')
       left = "#{left}..." if argument.variadic?
-      {left, describe(argument.description, argument.value_choices)}
+      notes = argument.value_choices.empty? ? [] of String : ["[values: #{argument.value_choices.join(", ")}]"]
+      {left, describe(argument.description, notes)}
     end
 
-    private def describe(description : String, choices : Array(String)) : String
-      return description if choices.empty?
-      values = "[values: #{choices.join(", ")}]"
-      description.empty? ? values : "#{description} #{values}"
+    private def describe(description : String, notes : Array(String)) : String
+      ([description] + notes).reject(&.empty?).join(" ")
     end
   end
 end

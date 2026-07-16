@@ -139,13 +139,102 @@ describe "compile-time rejections", tags: "compile" do
       CR
   end
 
-  it "rejects an Array(Bool) option" do
-    assert_compile_time_error "A flag can't take a value, so it can't be one of several", <<-CR
+  it "rejects an Array(Bool) option and points at counted flags" do
+    assert_compile_time_error "Use a plain `Bool`, or `Int32` with `count: true` for `-vvv` counting", <<-CR
       require "../src/kebab"
       struct C
         include Kebab::Parseable
         @[Kebab::Option]
         getter flags : Array(Bool) = [] of Bool
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a non-Bool count value" do
+    assert_compile_time_error "@[Kebab::Option(count:)] on 'verbosity' must be true or false", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(count: 1)]
+        getter verbosity : Int32 = 0
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a counted Bool flag with a number-specific message" do
+    assert_compile_time_error "a Bool flag is already a flag. Counting needs a number", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(count: true)]
+        getter? verbosity : Bool = false
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a counted flag that is not an integer type" do
+    assert_compile_time_error "a counted flag must be an integer type", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(count: true)]
+        getter verbosity : String = ""
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a counted flag with a converter" do
+    assert_compile_time_error "a counted flag takes no value to convert", <<-CR
+      require "../src/kebab"
+      module Conv
+        def self.convert(input : String) : Int32 | Kebab::Convert::Failure
+          input.to_i
+        end
+      end
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(count: true, converter: Conv)]
+        getter verbosity : Int32 = 0
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a counted flag with an arity" do
+    assert_compile_time_error "a counted flag takes no values. Remove the `arity:`", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(count: true, arity: 2)]
+        getter verbosity : Int32 = 0
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a counted flag with value_names" do
+    assert_compile_time_error "a counted flag takes no values. Remove the `value_names:`", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(count: true, value_names: {"n"})]
+        getter verbosity : Int32 = 0
+      end
+      C.parse([] of String)
+      CR
+  end
+
+  it "rejects a nilable counted flag" do
+    assert_compile_time_error "Counted flag 'verbosity' on C can't be nilable", <<-CR
+      require "../src/kebab"
+      struct C
+        include Kebab::Parseable
+        @[Kebab::Option(count: true)]
+        getter verbosity : Int32?
       end
       C.parse([] of String)
       CR
