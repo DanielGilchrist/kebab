@@ -14,16 +14,48 @@ require "./schema/usage"
 require "./token"
 
 module Kebab
-  # Included on a `struct` to make it parseable from `Array(String)` args.
-  # See the project README for examples.
+  # Mix into a `struct` to parse it from command-line arguments.
+  #
+  # Annotate the struct with `Kebab::Command`, its fields with `Kebab::Option`,
+  # `Kebab::Argument`, or `Kebab::Subcommand`, then call `.parse` or `.run`.
+  #
+  # ```
+  # @[Kebab::Command(summary: "Greet someone")]
+  # struct Greet
+  #   include Kebab::Parseable
+  #
+  #   @[Kebab::Argument(description: "Name to greet")]
+  #   getter name : String
+  #
+  #   @[Kebab::Option(short: 'l', description: "Make it loud")]
+  #   getter? loud : Bool = false
+  # end
+  #
+  # case result = Greet.parse(["-l", "Ada"])
+  # in Greet         then puts result.loud? ? "HELLO #{result.name}" : "Hello #{result.name}"
+  # in Kebab::Help   then puts result        # the user passed --help
+  # in Kebab::Errors then STDERR.puts result # the input was invalid
+  # end
+  # ```
+  #
+  # ### Parsing and dispatch
+  #
+  # `.parse` never raises. It returns the parsed struct, a `Kebab::Help` when the
+  # user asked for help, or a `Kebab::Errors` when the input was invalid, so
+  # Crystal's `case ... in` makes you handle all three.
+  #
+  # For a command that owns its behaviour, define `def run` and call `.run`, which
+  # parses, invokes `run` on success, and writes help and errors for you.
+  #
+  # `.schema` returns the command tree as a `Kebab::Schema::Command` for help,
+  # completion, and your own tooling.
   module Parseable
     macro included
       @__kebab_parent_path : Array(String) = [] of String
       @__kebab_inherited_globals : Array(::Kebab::Schema::Option) = [] of ::Kebab::Schema::Option
 
       # Parses `args` (defaulting to `ARGV`) into either an instance of `self`,
-      # a `Kebab::Help` (if the user asked for help), or one of the
-      # `Kebab::Errors` variants. Never raises.
+      # a `Kebab::Help` (if the user asked for help), or one of the `Kebab::Errors` variants.
       def self.parse(args : Array(String) = ARGV) : self | ::Kebab::Help | ::Kebab::Errors
         __kebab_parse(args, [] of String)
       end
@@ -62,8 +94,7 @@ module Kebab
       end
 
       # Returns the command and its whole subtree as an immutable
-      # `Kebab::Schema::Command`, derived at compile time. Pure and total,
-      # never raises.
+      # `Kebab::Schema::Command`, derived at compile time.
       def self.schema : ::Kebab::Schema::Command
         __kebab_schema([] of String)
       end
@@ -951,7 +982,7 @@ module Kebab
     end
 
     # Counts one more occurrence, saturating at the type's maximum so a flood of
-    # flags (`-vvv...`) can never overflow a narrow int and break `never raises`.
+    # flags (`-vvv...`) can never overflow a narrow int.
     macro __kebab_count_up(value, base)
       %current = {{value}} || {{base}}.zero
       {{value}} = %current < {{base}}::MAX ? %current + 1 : %current

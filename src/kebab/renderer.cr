@@ -37,9 +37,6 @@ module Kebab
       short = option.short
       left = short ? "-#{short}, --#{option.long}" : "    --#{option.long}"
       option.value_names.each { |name| left = "#{left} <#{name}>" }
-      # `...` always means "more values in this occurrence", the bracketed
-      # `[repeatable]` always means "give the flag again". They are separate axes,
-      # so a variadic list honestly carries both.
       left = "#{left}..." if option.variable?
       notes = [] of String
       notes << "[values: #{option.value_choices.join(", ")}]" unless option.value_choices.empty?

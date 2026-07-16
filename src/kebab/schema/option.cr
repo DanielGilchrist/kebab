@@ -2,11 +2,7 @@ module Kebab
   module Schema
     # An option flag declared on a command.
     struct Option
-      # How the option accumulates across occurrences. This is the axis
-      # `min_values`/`max_values` can't express: a flag and a counter are both
-      # `0..0`, a scalar and a repeatable value are both `1..1`. Whether the
-      # option takes a value is `takes_value?` (from `min_values`); this is only
-      # about repetition, so the two never encode the same fact twice.
+      # How the option accumulates across occurrences.
       enum Repetition
         # Given at most once (a flag, or a value option that isn't repeatable).
         None

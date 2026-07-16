@@ -187,14 +187,13 @@ describe "Kebab::Parseable help" do
   it "separates values-per-occurrence (...) from repeat-the-flag ([repeatable])" do
     text = help_for(HelpSpecRepeat.parse(["--help"]))
 
-    # `...` means more values in one occurrence; the bracket means say it again.
-    text.should contain("Verbosity [repeatable]") # count: no value, repeats
+    text.should contain("Verbosity [repeatable]")
     text.should_not contain("--verbosity...")
-    text.should contain("--tag <value>") # list: one value, repeats
+    text.should contain("--tag <value>")
     text.should contain("Tags [repeatable]")
     text.should_not contain("--tag <value>...")
-    text.should contain("--files <file> <file>...")      # variadic: more values here
-    text.should contain("[up to 4 values] [repeatable]") # and repeatable
-    text.should_not contain("Name [repeatable]")         # scalar: neither
+    text.should contain("--files <file> <file>...")
+    text.should contain("[up to 4 values] [repeatable]")
+    text.should_not contain("Name [repeatable]")
   end
 end

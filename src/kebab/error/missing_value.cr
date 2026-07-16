@@ -34,6 +34,7 @@ module Kebab
           else
             "at least #{min} value#{"s" if min > 1}"
           end
+
         "option \"#{label}\" expects #{counted}, got #{@got}."
       end
 
