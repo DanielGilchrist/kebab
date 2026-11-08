@@ -44,8 +44,8 @@ module Kebab
     }
 
     {% for number_type, suffix in NUMBER_SUFFIXES %}
-      def convert(type : {{number_type}}.class, raw : String) : {{number_type}} | Failure
-        raw.to_{{suffix.id}}? || failure(name: {{number_type == Float32 || number_type == Float64 ? "decimal number" : "whole number"}})
+      def convert(type : {{ number_type }}.class, raw : String) : {{ number_type }} | Failure
+        raw.to_{{ suffix.id }}? || failure(name: {{ number_type == Float32 || number_type == Float64 ? "decimal number" : "whole number" }})
       end
     {% end %}
 

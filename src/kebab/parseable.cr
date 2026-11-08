@@ -109,7 +109,7 @@ module Kebab
             {% if subcommand_ivar %}
               {% members = subcommand_ivar.type.union? ? subcommand_ivar.type.union_types.reject { |union_type| union_type == Nil } : [subcommand_ivar.type] %}
               {% for member in members %}
-                if {{member}}.__kebab_route_error(error, stderr)
+                if {{ member }}.__kebab_route_error(error, stderr)
                   return true
                 end
               {% end %}
@@ -212,11 +212,11 @@ module Kebab
               member_pairs = member_pairs.sort_by { |member_pair| member_pair[0] }
             %}
 
-            %path = parent_path + [{{command_name}}]
+            %path = parent_path + [{{ command_name }}]
 
             %options = [
               {% for spec in option_specs %}
-                ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}}, value_choices: {% if spec[:choices_enum] %}{{spec[:choices_enum]}}.names.map(&.underscore).sort{% else %}[] of ::String{% end %}, repetition: ::Kebab::Schema::Option::Repetition::{{spec[:repetition].id}}),
+                ::Kebab::Schema::Option.new(long: {{ spec[:long] }}, short: {{ spec[:short] }}, description: {{ spec[:description] }}, value_names: [{{ spec[:value_names].splat }}] of ::String, min_values: {{ spec[:min_values] }}, max_values: {{ spec[:max_values] }}, value_choices: {% if spec[:choices_enum] %}{{ spec[:choices_enum] }}.names.map(&.underscore).sort{% else %}[] of ::String{% end %}, repetition: ::Kebab::Schema::Option::Repetition::{{ spec[:repetition].id }}),
               {% end %}
             ] of ::Kebab::Schema::Option
 
@@ -224,7 +224,7 @@ module Kebab
             # %options indices hold because inherited globals and help are appended after.
             %own_globals = [
               {% for spec, index in option_specs %}
-                {% if spec[:global] %}%options[{{index}}],{% end %}
+                {% if spec[:global] %}%options[{{ index }}],{% end %}
               {% end %}
             ] of ::Kebab::Schema::Option
 
@@ -235,23 +235,23 @@ module Kebab
 
             ::Kebab::Schema::Command.new(
               path: %path,
-              summary: {{summary}},
+              summary: {{ summary }},
               options: %options,
               arguments: [
                 {% for spec in argument_specs %}
-                  ::Kebab::Schema::Argument.new(name: {{spec[:arg_name]}}, description: {{spec[:description]}}, variadic: {{spec[:variadic]}}, value_count: {{spec[:width]}}, value_choices: {% if spec[:choices_enum] %}{{spec[:choices_enum]}}.names.map(&.underscore).sort{% else %}[] of ::String{% end %}),
+                  ::Kebab::Schema::Argument.new(name: {{ spec[:arg_name] }}, description: {{ spec[:description] }}, variadic: {{ spec[:variadic] }}, value_count: {{ spec[:width] }}, value_choices: {% if spec[:choices_enum] %}{{ spec[:choices_enum] }}.names.map(&.underscore).sort{% else %}[] of ::String{% end %}),
                 {% end %}
               ] of ::Kebab::Schema::Argument,
               subcommands: [
                 {% for member_pair in member_pairs %}
-                  {{member_pair[1]}}.__kebab_schema(%path, inherited_globals + %own_globals),
+                  {{ member_pair[1] }}.__kebab_schema(%path, inherited_globals + %own_globals),
                 {% end %}
                 {% if !member_pairs.empty? && !user_help_subcommand %}
                   ::Kebab::Schema::Command.new(path: %path + ["help"], summary: "Show this help"),
                 {% end %}
               ] of ::Kebab::Schema::Command,
-              has_options: {{has_declared_options}} || !inherited_globals.empty?,
-              requires_subcommand: {{requires_subcommand}},
+              has_options: {{ has_declared_options }} || !inherited_globals.empty?,
+              requires_subcommand: {{ requires_subcommand }},
             )
           {% end %}
         end
@@ -388,19 +388,19 @@ module Kebab
                   %value{spec[:name]} = nil
                   %raws{spec[:name]} = [] of ::String
                 {% else %}
-                  %value{spec[:name]} : {{spec[:base]}}? = nil
+                  %value{spec[:name]} : {{ spec[:base] }}? = nil
                 {% end %}
               {% end %}
 
               {% if subcommand_ivar %}
-                %value{subcommand_ivar.name} : ::Union({{subcommand_members.splat}}, ::Nil) = nil
+                %value{subcommand_ivar.name} : ::Union({{ subcommand_members.splat }}, ::Nil) = nil
               {% end %}
 
               {% for spec in option_specs %}
-                %schema{spec[:name]} = ::Kebab::Schema::Option.new(long: {{spec[:long]}}, short: {{spec[:short]}}, description: {{spec[:description]}}, value_names: [{{spec[:value_names].splat}}] of ::String, min_values: {{spec[:min_values]}}, max_values: {{spec[:max_values]}}, repetition: ::Kebab::Schema::Option::Repetition::{{spec[:repetition].id}})
+                %schema{spec[:name]} = ::Kebab::Schema::Option.new(long: {{ spec[:long] }}, short: {{ spec[:short] }}, description: {{ spec[:description] }}, value_names: [{{ spec[:value_names].splat }}] of ::String, min_values: {{ spec[:min_values] }}, max_values: {{ spec[:max_values] }}, repetition: ::Kebab::Schema::Option::Repetition::{{ spec[:repetition].id }})
               {% end %}
               {% for spec in argument_specs %}
-                %arg_schema{spec[:name]} = ::Kebab::Schema::Argument.new(name: {{spec[:arg_name]}}, description: {{spec[:description]}}, variadic: {{spec[:variadic]}}, value_count: {{spec[:width]}})
+                %arg_schema{spec[:name]} = ::Kebab::Schema::Argument.new(name: {{ spec[:arg_name] }}, description: {{ spec[:description] }}, variadic: {{ spec[:variadic] }}, value_count: {{ spec[:width] }})
               {% end %}
 
               {% if !global_specs.empty? || subcommand_ivar %}
@@ -435,19 +435,19 @@ module Kebab
                 in ::Kebab::Token::Long
                   {% if option_specs.empty? %}
                     __kebab_bail(::Kebab::Help.new(__kebab_help_text)) if %token.name == "help"
-                    __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: %token.to_s, schema: __kebab_schema_node))
+                    __kebab_bail(::Kebab::Error::UnknownOption::For({{ @type }}).new(input: %token.to_s, schema: __kebab_schema_node))
                   {% else %}
                     case %token.name
                     {% for spec in option_specs %}
-                      when {{spec[:long]}}
+                      when {{ spec[:long] }}
                         {% unless spec[:repeatable] %}
                           unless %value{spec[:name]}.nil?
-                            __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{spec[:name]}, schema: __kebab_schema_node))
+                            __kebab_bail(::Kebab::Error::RepeatedOption::For({{ @type }}).new(%schema{spec[:name]}, schema: __kebab_schema_node))
                           end
                         {% end %}
                         {% if spec[:base] == Bool %}
                           if %inline = %token.value
-                            __kebab_bail(::Kebab::Error::InvalidValue::Exact(Bool, {{@type}}).new(
+                            __kebab_bail(::Kebab::Error::InvalidValue::Exact(Bool, {{ @type }}).new(
                               value: %inline,
                               source: %schema{spec[:name]},
                               schema: __kebab_schema_node,
@@ -458,7 +458,7 @@ module Kebab
                           %value{spec[:name]} = true
                         {% elsif spec[:count] %}
                           if %inline = %token.value
-                            __kebab_bail(::Kebab::Error::InvalidValue::Exact({{spec[:base]}}, {{@type}}).new(
+                            __kebab_bail(::Kebab::Error::InvalidValue::Exact({{ spec[:base] }}, {{ @type }}).new(
                               value: %inline,
                               source: %schema{spec[:name]},
                               schema: __kebab_schema_node,
@@ -466,9 +466,9 @@ module Kebab
                               reason: "flags don't accept inline values",
                             ))
                           end
-                          __kebab_count_up(%value{spec[:name]}, {{spec[:base]}})
+                          __kebab_count_up(%value{spec[:name]}, {{ spec[:base] }})
                         {% else %}
-                          __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %token.value, %index, %separated, {{spec[:base]}}, {{spec[:element]}}, {{spec[:tuple_types]}}, {{spec[:array]}}, {{spec[:collects]}}, {{spec[:converter]}}, {{spec[:min_values]}}, {{spec[:max_values]}}, nil)
+                          __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %token.value, %index, %separated, {{ spec[:base] }}, {{ spec[:element] }}, {{ spec[:tuple_types] }}, {{ spec[:array] }}, {{ spec[:collects] }}, {{ spec[:converter] }}, {{ spec[:min_values] }}, {{ spec[:max_values] }}, nil)
                         {% end %}
                     {% end %}
                     {% unless user_defined_help_long %}
@@ -476,13 +476,13 @@ module Kebab
                         __kebab_bail(::Kebab::Help.new(__kebab_help_text))
                     {% end %}
                     else
-                      __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: %token.to_s, schema: __kebab_schema_node))
+                      __kebab_bail(::Kebab::Error::UnknownOption::For({{ @type }}).new(input: %token.to_s, schema: __kebab_schema_node))
                     end
                   {% end %}
                 in ::Kebab::Token::Shorts
                   %chars = %token.chars
                   if %chars.empty?
-                    __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: %raw, schema: __kebab_schema_node))
+                    __kebab_bail(::Kebab::Error::UnknownOption::For({{ @type }}).new(input: %raw, schema: __kebab_schema_node))
                   end
                   %chars.each_char_with_index do |%char, %char_index|
                     %last_char = %char_index == %chars.size - 1
@@ -490,19 +490,19 @@ module Kebab
                       {% unless user_defined_help_short %}
                         __kebab_bail(::Kebab::Help.new(__kebab_help_text)) if %char == 'h'
                       {% end %}
-                      __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: "-#{%char}", schema: __kebab_schema_node))
+                      __kebab_bail(::Kebab::Error::UnknownOption::For({{ @type }}).new(input: "-#{%char}", schema: __kebab_schema_node))
                     {% else %}
                       case %char
                       {% for spec in short_specs %}
-                        when {{spec[:short]}}
+                        when {{ spec[:short] }}
                           {% unless spec[:repeatable] %}
                             unless %value{spec[:name]}.nil?
-                              __kebab_bail(::Kebab::Error::RepeatedOption::For({{@type}}).new(%schema{spec[:name]}, schema: __kebab_schema_node, invoked: "-#{%char}"))
+                              __kebab_bail(::Kebab::Error::RepeatedOption::For({{ @type }}).new(%schema{spec[:name]}, schema: __kebab_schema_node, invoked: "-#{%char}"))
                             end
                           {% end %}
                           {% if spec[:base] == Bool %}
                             if %last_char && (%inline = %token.value)
-                              __kebab_bail(::Kebab::Error::InvalidValue::Exact(Bool, {{@type}}).new(
+                              __kebab_bail(::Kebab::Error::InvalidValue::Exact(Bool, {{ @type }}).new(
                                 value: %inline,
                                 source: %schema{spec[:name]},
                                 schema: __kebab_schema_node,
@@ -514,7 +514,7 @@ module Kebab
                             %value{spec[:name]} = true
                           {% elsif spec[:count] %}
                             if %last_char && (%inline = %token.value)
-                              __kebab_bail(::Kebab::Error::InvalidValue::Exact({{spec[:base]}}, {{@type}}).new(
+                              __kebab_bail(::Kebab::Error::InvalidValue::Exact({{ spec[:base] }}, {{ @type }}).new(
                                 value: %inline,
                                 source: %schema{spec[:name]},
                                 schema: __kebab_schema_node,
@@ -524,16 +524,16 @@ module Kebab
                               ))
                             end
                             # A counted short takes no value and does not end the cluster.
-                            __kebab_count_up(%value{spec[:name]}, {{spec[:base]}})
+                            __kebab_count_up(%value{spec[:name]}, {{ spec[:base] }})
                           {% else %}
                             # A valued short ends the cluster: the rest is its value (`-j4`), or the next token when it's last (`-j 4`).
                             if %last_char
-                              __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %token.value, %index, %separated, {{spec[:base]}}, {{spec[:element]}}, {{spec[:tuple_types]}}, {{spec[:array]}}, {{spec[:collects]}}, {{spec[:converter]}}, {{spec[:min_values]}}, {{spec[:max_values]}}, "-#{%char}")
+                              __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %token.value, %index, %separated, {{ spec[:base] }}, {{ spec[:element] }}, {{ spec[:tuple_types] }}, {{ spec[:array] }}, {{ spec[:collects] }}, {{ spec[:converter] }}, {{ spec[:min_values] }}, {{ spec[:max_values] }}, "-#{%char}")
                             else
                               # The tokenizer split any `=` into `value`, so put it back: `-Dfoo=bar` gives `-D` the value `foo=bar`.
                               %attached = %chars[(%char_index + 1)..]
                               %attached = "#{%attached}=#{%token.value}" if %token.value
-                              __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %attached, %index, %separated, {{spec[:base]}}, {{spec[:element]}}, {{spec[:tuple_types]}}, {{spec[:array]}}, {{spec[:collects]}}, {{spec[:converter]}}, {{spec[:min_values]}}, {{spec[:max_values]}}, "-#{%char}")
+                              __kebab_option_value(%value{spec[:name]}, {% if spec[:collects] %}%raws{spec[:name]}{% else %}nil{% end %}, %schema{spec[:name]}, %attached, %index, %separated, {{ spec[:base] }}, {{ spec[:element] }}, {{ spec[:tuple_types] }}, {{ spec[:array] }}, {{ spec[:collects] }}, {{ spec[:converter] }}, {{ spec[:min_values] }}, {{ spec[:max_values] }}, "-#{%char}")
                               break
                             end
                           {% end %}
@@ -543,7 +543,7 @@ module Kebab
                           __kebab_bail(::Kebab::Help.new(__kebab_help_text))
                       {% end %}
                       else
-                        __kebab_bail(::Kebab::Error::UnknownOption::For({{@type}}).new(input: "-#{%char}", schema: __kebab_schema_node))
+                        __kebab_bail(::Kebab::Error::UnknownOption::For({{ @type }}).new(input: "-#{%char}", schema: __kebab_schema_node))
                       end
                     {% end %}
                   end
@@ -551,14 +551,14 @@ module Kebab
                   {% if subcommand_ivar %}
                     # Tokens after `--` are operands, never command dispatch.
                     if %separated
-                      __kebab_bail(::Kebab::Error::UnexpectedArgument::For({{@type}}).new(%token.value, __kebab_schema_node))
+                      __kebab_bail(::Kebab::Error::UnexpectedArgument::For({{ @type }}).new(%token.value, __kebab_schema_node))
                     end
                     case %token.value
                     {% unless user_defined_help_subcommand %}
                       when "help"
                         # `app help sub` shows sub's help, like `app sub --help`. Bare `help` shows this command's.
                         if %index + 1 < args.size
-                          case %help = {{@type}}.__kebab_parse(args[(%index + 1)..] + ["--help"], @__kebab_parent_path, @__kebab_inherited_globals)
+                          case %help = {{ @type }}.__kebab_parse(args[(%index + 1)..] + ["--help"], @__kebab_parent_path, @__kebab_inherited_globals)
                           when ::Kebab::Help
                             __kebab_bail(%help)
                           when ::Kebab::Errors
@@ -571,22 +571,22 @@ module Kebab
                         end
                     {% end %}
                     {% for member, member_index in subcommand_members %}
-                      when {{subcommand_names[member_index]}}
-                        case %subcommand = {{member}}.__kebab_parse(args[(%index + 1)..], @__kebab_parent_path + [{{own_command_name}}], @__kebab_inherited_globals + %own_globals)
-                        when {{member}}
+                      when {{ subcommand_names[member_index] }}
+                        case %subcommand = {{ member }}.__kebab_parse(args[(%index + 1)..], @__kebab_parent_path + [{{ own_command_name }}], @__kebab_inherited_globals + %own_globals)
+                        when {{ member }}
                           %value{subcommand_ivar.name} = %subcommand
                         when ::Kebab::Help
                           __kebab_bail(%subcommand)
                         when ::Kebab::Errors
                           __kebab_bail(%subcommand)
                         else
-                          raise "unreachable: #{%subcommand.class} from {{member}}.parse"
+                          raise "unreachable: #{%subcommand.class} from {{ member }}.parse"
                         end
 
                         break
                     {% end %}
                     else
-                      __kebab_bail(::Kebab::Error::UnknownCommand::For({{@type}}).new(input: %token.value, schema: __kebab_schema_node))
+                      __kebab_bail(::Kebab::Error::UnknownCommand::For({{ @type }}).new(input: %token.value, schema: __kebab_schema_node))
                     end
                   {% else %}
                     %positionals << %token.value
@@ -599,37 +599,37 @@ module Kebab
               {% offset = 0 %}
               {% for spec in argument_specs %}
                 {% if spec[:variadic] && spec[:tuple] %}
-                  if %positionals.size > {{offset}}
-                    if (%remainder{spec[:name]} = (%positionals.size - {{offset}}) % {{spec[:width]}}) != 0
-                      __kebab_bail(::Kebab::Error::UnexpectedArgument::For({{@type}}).new(%positionals[%positionals.size - %remainder{spec[:name]}], __kebab_schema_node))
+                  if %positionals.size > {{ offset }}
+                    if (%remainder{spec[:name]} = (%positionals.size - {{ offset }}) % {{ spec[:width] }}) != 0
+                      __kebab_bail(::Kebab::Error::UnexpectedArgument::For({{ @type }}).new(%positionals[%positionals.size - %remainder{spec[:name]}], __kebab_schema_node))
                     end
-                    %elements = [] of {{spec[:inner]}}
-                    %i = {{offset}}
+                    %elements = [] of {{ spec[:inner] }}
+                    %i = {{ offset }}
                     while %i < %positionals.size
-                      %elements << { {% for tuple_type, tuple_position in spec[:tuple_types] %} __kebab_convert_value({{tuple_type}}, %arg_schema{spec[:name]}, %positionals[%i + {{tuple_position}}], {{spec[:converter]}}), {% end %} }
-                      %i += {{spec[:width]}}
+                      %elements << { {% for tuple_type, tuple_position in spec[:tuple_types] %} __kebab_convert_value({{ tuple_type }}, %arg_schema{spec[:name]}, %positionals[%i + {{ tuple_position }}], {{ spec[:converter] }}), {% end %} }
+                      %i += {{ spec[:width] }}
                     end
                     %value{spec[:name]} = %elements
                   end
                 {% elsif spec[:variadic] %}
-                  if %positionals.size > {{offset}}
-                    %elements = [] of {{spec[:inner]}}
-                    %i = {{offset}}
+                  if %positionals.size > {{ offset }}
+                    %elements = [] of {{ spec[:inner] }}
+                    %i = {{ offset }}
                     while %i < %positionals.size
                       {% if spec[:converter] %}
-                        __kebab_append(%elements, __kebab_convert_element(%arg_schema{spec[:name]}, %positionals[%i], {{spec[:converter]}}))
+                        __kebab_append(%elements, __kebab_convert_element(%arg_schema{spec[:name]}, %positionals[%i], {{ spec[:converter] }}))
                       {% else %}
-                        %elements << __kebab_convert({{spec[:inner]}}, %arg_schema{spec[:name]}, %positionals[%i])
+                        %elements << __kebab_convert({{ spec[:inner] }}, %arg_schema{spec[:name]}, %positionals[%i])
                       {% end %}
                       %i += 1
                     end
                     %value{spec[:name]} = %elements
                   end
                 {% elsif spec[:collects] %}
-                  if %positionals.size > {{offset}}
-                    %i = {{offset}}
+                  if %positionals.size > {{ offset }}
+                    %i = {{ offset }}
                     while %i < %positionals.size
-                      %element{spec[:name]} = __kebab_convert_element(%arg_schema{spec[:name]}, %positionals[%i], {{spec[:converter]}})
+                      %element{spec[:name]} = __kebab_convert_element(%arg_schema{spec[:name]}, %positionals[%i], {{ spec[:converter] }})
                       if %existing{spec[:name]} = %value{spec[:name]}
                         %existing{spec[:name]} << %element{spec[:name]}
                       else
@@ -640,23 +640,23 @@ module Kebab
                     end
                   end
                 {% elsif spec[:tuple] %}
-                  if %positionals.size >= {{offset + spec[:width]}}
-                    %value{spec[:name]} = { {% for tuple_type, tuple_position in spec[:tuple_types] %} __kebab_convert_value({{tuple_type}}, %arg_schema{spec[:name]}, %positionals[{{offset + tuple_position}}], {{spec[:converter]}}), {% end %} }
-                  elsif %positionals.size > {{offset}}
-                    __kebab_bail(::Kebab::Error::MissingArgument::For({{@type}}).new(argument: %arg_schema{spec[:name]}, schema: __kebab_schema_node))
+                  if %positionals.size >= {{ offset + spec[:width] }}
+                    %value{spec[:name]} = { {% for tuple_type, tuple_position in spec[:tuple_types] %} __kebab_convert_value({{ tuple_type }}, %arg_schema{spec[:name]}, %positionals[{{ offset + tuple_position }}], {{ spec[:converter] }}), {% end %} }
+                  elsif %positionals.size > {{ offset }}
+                    __kebab_bail(::Kebab::Error::MissingArgument::For({{ @type }}).new(argument: %arg_schema{spec[:name]}, schema: __kebab_schema_node))
                   end
                   {% offset = offset + spec[:width] %}
                 {% else %}
-                  if %positional{spec[:name]} = %positionals[{{offset}}]?
-                    %value{spec[:name]} = __kebab_convert_value({{spec[:base]}}, %arg_schema{spec[:name]}, %positional{spec[:name]}, {{spec[:converter]}})
+                  if %positional{spec[:name]} = %positionals[{{ offset }}]?
+                    %value{spec[:name]} = __kebab_convert_value({{ spec[:base] }}, %arg_schema{spec[:name]}, %positional{spec[:name]}, {{ spec[:converter] }})
                   end
                   {% offset = offset + 1 %}
                 {% end %}
               {% end %}
 
               {% if !subcommand_ivar && !has_variadic_argument %}
-                if %extra = %positionals[{{offset}}]?
-                  __kebab_bail(::Kebab::Error::UnexpectedArgument::For({{@type}}).new(%extra, __kebab_schema_node))
+                if %extra = %positionals[{{ offset }}]?
+                  __kebab_bail(::Kebab::Error::UnexpectedArgument::For({{ @type }}).new(%extra, __kebab_schema_node))
                 end
               {% end %}
 
@@ -666,35 +666,35 @@ module Kebab
                 %assigned{subcommand_ivar.name} = %value{subcommand_ivar.name}
                 if %assigned{subcommand_ivar.name}.nil?
                   {% if subcommand_required %}
-                    __kebab_bail(::Kebab::Error::MissingCommand::For({{@type}}).new(__kebab_schema_node))
+                    __kebab_bail(::Kebab::Error::MissingCommand::For({{ @type }}).new(__kebab_schema_node))
                   {% else %}
                     __kebab_bail(::Kebab::Help.new(__kebab_help_text))
                   {% end %}
                 end
-                @{{subcommand_ivar.name}} = %assigned{subcommand_ivar.name}
+                @{{ subcommand_ivar.name }} = %assigned{subcommand_ivar.name}
               {% end %}
 
               # Option specs carry `:long`; argument specs don't, which tells them apart.
               {% for spec in option_specs + argument_specs %}
                 %assigned{spec[:name]} = %value{spec[:name]}
-                @{{spec[:name]}} =
+                @{{ spec[:name] }} =
                   if %assigned{spec[:name]}.nil?
                     {% if spec[:ivar].has_default_value? %}
-                      {{spec[:ivar].default_value}}
+                      {{ spec[:ivar].default_value }}
                     {% elsif spec[:count] %}
-                      {{spec[:base]}}.zero
+                      {{ spec[:base] }}.zero
                     {% elsif spec[:base] == Bool %}
                       false
                     {% elsif spec[:ivar].type.nilable? %}
                       nil
                     {% elsif spec[:long] %}
-                      __kebab_bail(::Kebab::Error::MissingOption::For({{@type}}).new(option: %schema{spec[:name]}, schema: __kebab_schema_node))
+                      __kebab_bail(::Kebab::Error::MissingOption::For({{ @type }}).new(option: %schema{spec[:name]}, schema: __kebab_schema_node))
                     {% else %}
-                      __kebab_bail(::Kebab::Error::MissingArgument::For({{@type}}).new(argument: %arg_schema{spec[:name]}, schema: __kebab_schema_node))
+                      __kebab_bail(::Kebab::Error::MissingArgument::For({{ @type }}).new(argument: %arg_schema{spec[:name]}, schema: __kebab_schema_node))
                     {% end %}
                   else
                     {% if spec[:collects] %}
-                      __kebab_collect({{spec[:base]}}, {% if spec[:long] %}%schema{spec[:name]}{% else %}%arg_schema{spec[:name]}{% end %}, %raws{spec[:name]}, {{spec[:converter]}}, %assigned{spec[:name]})
+                      __kebab_collect({{ spec[:base] }}, {% if spec[:long] %}%schema{spec[:name]}{% else %}%arg_schema{spec[:name]}{% end %}, %raws{spec[:name]}, {{ spec[:converter] }}, %assigned{spec[:name]})
                     {% else %}
                       %assigned{spec[:name]}
                     {% end %}
@@ -791,7 +791,7 @@ module Kebab
                       index += 1
                     else
                       {% begin %}
-                        __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(option, schema: __kebab_schema_node, got: consumed, invoked: invoked))
+                        __kebab_bail(::Kebab::Error::MissingValue::For({{ @type }}).new(option, schema: __kebab_schema_node, got: consumed, invoked: invoked))
                       {% end %}
                     end
                   end
@@ -826,7 +826,7 @@ module Kebab
 
           if values.size < option.min_values
             {% begin %}
-              __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(option, schema: __kebab_schema_node, got: values.size, invoked: invoked))
+              __kebab_bail(::Kebab::Error::MissingValue::For({{ @type }}).new(option, schema: __kebab_schema_node, got: values.size, invoked: invoked))
             {% end %}
           end
 
@@ -837,7 +837,7 @@ module Kebab
           next_raw = args[index + 1]?
           if next_raw.nil? || (!separated && !__kebab_value_token?(next_raw))
             {% begin %}
-              __kebab_bail(::Kebab::Error::MissingValue::For({{@type}}).new(option, schema: __kebab_schema_node, invoked: invoked))
+              __kebab_bail(::Kebab::Error::MissingValue::For({{ @type }}).new(option, schema: __kebab_schema_node, invoked: invoked))
             {% end %}
           end
 
@@ -858,7 +858,7 @@ module Kebab
             result
           in ::Kebab::Convert::Failure
             {% begin %}
-              __kebab_bail(::Kebab::Error::InvalidValue::Exact(T, {{@type}}).from(result, value: raw, source: source, schema: __kebab_schema_node, invoked: invoked))
+              __kebab_bail(::Kebab::Error::InvalidValue::Exact(T, {{ @type }}).from(result, value: raw, source: source, schema: __kebab_schema_node, invoked: invoked))
             {% end %}
           end
         end
@@ -899,7 +899,7 @@ module Kebab
             result
           in ::Kebab::Convert::Failure
             {% begin %}
-              __kebab_bail(::Kebab::Error::InvalidCollection::Exact(T, {{@type}}).from(result, values: values, source: source, schema: __kebab_schema_node))
+              __kebab_bail(::Kebab::Error::InvalidCollection::Exact(T, {{ @type }}).from(result, values: values, source: source, schema: __kebab_schema_node))
             {% end %}
           end
         end
@@ -910,71 +910,71 @@ module Kebab
     # store them on `value`. Shared by the long and short parsing branches.
     macro __kebab_option_value(value, raws, schema, inline, index, separated, base, element, tuple_types, array, collects, converter, min_values, max_values, invoked)
       {% if min_values == 1 && max_values == 1 %}
-        %raw_value = {{inline}} || __kebab_next_value(args, {{index}}, {{separated}}, {{schema}}, {{invoked}}).tap { {{index}} += 1 }
+        %raw_value = {{ inline }} || __kebab_next_value(args, {{ index }}, {{ separated }}, {{ schema }}, {{ invoked }}).tap { {{ index }} += 1 }
         {% if collects %}
-          %element = __kebab_convert_element({{schema}}, %raw_value, {{converter}}, {{invoked}})
-          if %existing = {{value}}
+          %element = __kebab_convert_element({{ schema }}, %raw_value, {{ converter }}, {{ invoked }})
+          if %existing = {{ value }}
             %existing << %element
           else
-            {{value}} = [%element]
+            {{ value }} = [%element]
           end
-          {{raws}} << %raw_value
+          {{ raws }} << %raw_value
         {% elsif array %}
           {% if converter %}
-            %element = __kebab_convert_element({{schema}}, %raw_value, {{converter}}, {{invoked}})
+            %element = __kebab_convert_element({{ schema }}, %raw_value, {{ converter }}, {{ invoked }})
           {% else %}
-            %element = __kebab_convert({{element}}, {{schema}}, %raw_value, invoked: {{invoked}})
+            %element = __kebab_convert({{ element }}, {{ schema }}, %raw_value, invoked: {{ invoked }})
           {% end %}
-          if %existing = {{value}}
+          if %existing = {{ value }}
             __kebab_append(%existing, %element)
           else
-            {{value}} = __kebab_list(%element)
+            {{ value }} = __kebab_list(%element)
           end
         {% else %}
-          {{value}} = __kebab_convert_value({{base}}, {{schema}}, %raw_value, {{converter}}, {{invoked}})
+          {{ value }} = __kebab_convert_value({{ base }}, {{ schema }}, %raw_value, {{ converter }}, {{ invoked }})
         {% end %}
       {% else %}
-        if %inline = {{inline}}
-          __kebab_bail(::Kebab::Error::InvalidValue::Exact({{base}}, {{@type}}).new(
+        if %inline = {{ inline }}
+          __kebab_bail(::Kebab::Error::InvalidValue::Exact({{ base }}, {{ @type }}).new(
             value: %inline,
-            source: {{schema}},
+            source: {{ schema }},
             schema: __kebab_schema_node,
             reason: "takes multiple values as separate tokens, not inline",
-            invoked: {{invoked}},
+            invoked: {{ invoked }},
           ))
         end
-        %values = __kebab_next_values(args, {{index}}, {{separated}}, {{schema}}, {{invoked}})
-        {{index}} += %values.size
+        %values = __kebab_next_values(args, {{ index }}, {{ separated }}, {{ schema }}, {{ invoked }})
+        {{ index }} += %values.size
         {% if tuple_types && !array %}
-          {{value}} = { {% for tuple_type, position in tuple_types %} __kebab_convert_value({{tuple_type}}, {{schema}}, %values[{{position}}], {{converter}}, {{invoked}}), {% end %} }
+          {{ value }} = { {% for tuple_type, position in tuple_types %} __kebab_convert_value({{ tuple_type }}, {{ schema }}, %values[{{ position }}], {{ converter }}, {{ invoked }}), {% end %} }
         {% elsif tuple_types %}
-          %element = { {% for tuple_type, position in tuple_types %} __kebab_convert_value({{tuple_type}}, {{schema}}, %values[{{position}}], {{converter}}, {{invoked}}), {% end %} }
-          if %existing = {{value}}
+          %element = { {% for tuple_type, position in tuple_types %} __kebab_convert_value({{ tuple_type }}, {{ schema }}, %values[{{ position }}], {{ converter }}, {{ invoked }}), {% end %} }
+          if %existing = {{ value }}
             %existing << %element
           else
-            {{value}} = [%element] of {{element}}
+            {{ value }} = [%element] of {{ element }}
           end
         {% elsif collects %}
           %values.each do |%one|
-            %element = __kebab_convert_element({{schema}}, %one, {{converter}}, {{invoked}})
-            if %existing = {{value}}
+            %element = __kebab_convert_element({{ schema }}, %one, {{ converter }}, {{ invoked }})
+            if %existing = {{ value }}
               %existing << %element
             else
-              {{value}} = [%element]
+              {{ value }} = [%element]
             end
-            {{raws}} << %one
+            {{ raws }} << %one
           end
         {% else %}
           %values.each do |%one|
             {% if converter %}
-              %element = __kebab_convert_element({{schema}}, %one, {{converter}}, {{invoked}})
+              %element = __kebab_convert_element({{ schema }}, %one, {{ converter }}, {{ invoked }})
             {% else %}
-              %element = __kebab_convert({{element}}, {{schema}}, %one, invoked: {{invoked}})
+              %element = __kebab_convert({{ element }}, {{ schema }}, %one, invoked: {{ invoked }})
             {% end %}
-            if %existing = {{value}}
+            if %existing = {{ value }}
               __kebab_append(%existing, %element)
             else
-              {{value}} = __kebab_list(%element)
+              {{ value }} = __kebab_list(%element)
             end
           end
         {% end %}
@@ -984,15 +984,15 @@ module Kebab
     # Counts one more occurrence, saturating at the type's maximum so a flood of
     # flags (`-vvv...`) can never overflow a narrow int.
     macro __kebab_count_up(value, base)
-      %current = {{value}} || {{base}}.zero
-      {{value}} = %current < {{base}}::MAX ? %current + 1 : %current
+      %current = {{ value }} || {{ base }}.zero
+      {{ value }} = %current < {{ base }}::MAX ? %current + 1 : %current
     end
 
     macro __kebab_convert_value(base, source, raw, converter, invoked = nil)
       {% if converter %}
-        __kebab_convert({{base}}, {{source}}, {{raw}}, converter: {{converter}}, invoked: {{invoked}})
+        __kebab_convert({{ base }}, {{ source }}, {{ raw }}, converter: {{ converter }}, invoked: {{ invoked }})
       {% else %}
-        __kebab_convert({{base}}, {{source}}, {{raw}}, invoked: {{invoked}})
+        __kebab_convert({{ base }}, {{ source }}, {{ raw }}, invoked: {{ invoked }})
       {% end %}
     end
 
@@ -1000,7 +1000,7 @@ module Kebab
       {% begin %}
         {% subcommand_ivar = @type.instance_vars.find(&.annotation(::Kebab::Subcommand)) %}
         {% if subcommand_ivar %}
-          @{{subcommand_ivar.id}}.run(*forward_args, **forward_kwargs)
+          @{{ subcommand_ivar.id }}.run(*forward_args, **forward_kwargs)
         {% else %}
           raise "#{self.class}#run isn't defined. Add `def run(...) : Nil` so kebab can call it after parsing."
         {% end %}

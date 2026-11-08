@@ -500,7 +500,7 @@ module Kebab
       %}
 
       {% unless global_clash_names.empty? %}
-        __kebab_assert_no_global_clash({{@type}}, {{global_clash_names}})
+        __kebab_assert_no_global_clash({{ @type }}, {{ global_clash_names }})
       {% end %}
     end
 
@@ -529,7 +529,7 @@ module Kebab
                 {% end %}
               {% end %}
             {% end %}
-            __kebab_assert_no_global_clash({{member}}, {{names}})
+            __kebab_assert_no_global_clash({{ member }}, {{ names }})
           {% end %}
         {% end %}
       {% end %}

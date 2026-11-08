@@ -38,11 +38,11 @@ jobs:
           path: |
             ~/.cache/shards
             lib
-            bin
           key: shards-${{ runner.os }}-${{ hashFiles('shard.yml') }}
           restore-keys: |
             shards-${{ runner.os }}-
       - run: shards install
+      - run: mkdir -p bin && crystal build -o bin/ameba lib/ameba/bin/ameba.cr
       - run: ./bin/ameba
 
   spec:
